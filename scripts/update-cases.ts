@@ -165,7 +165,7 @@ async function sendEmailNotification(
       auth: { user: GMAIL_USER, pass: GMAIL_APP_PASSWORD },
     });
     await transporter.sendMail({
-      from: `"Mercury Case Tracker" <${GMAIL_USER}>`,
+      from: `"LexQuant" <${GMAIL_USER}>`,
       to,
       subject,
       html,

@@ -65,7 +65,7 @@ export function formatCaseUpdateMessage(
   if (courtName) msg += `<b>Court:</b> ${escapeHtml(courtName)}\n`;
   if (oldValue) msg += `<b>Previous:</b> ${escapeHtml(oldValue)}\n`;
   msg += `<b>Current:</b> ${escapeHtml(newValue)}\n`;
-  msg += `\n<i>Mercury Case Tracker</i>`;
+  msg += `\n<i>LexQuant</i>`;
 
   return msg;
 }

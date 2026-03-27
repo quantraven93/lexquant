@@ -1,0 +1,474 @@
+{% extends "base.html" %}
+
+{% block title %}Cases - Legal Case Manager{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <h1 class="page-title">Cases</h1>
+            <p class="page-subtitle">Manage your legal cases</p>
+        </div>
+        <button class="btn btn-primary" onclick="openCaseModal()">
+            ➕ Add New Case
+        </button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">All Cases</h2>
+        <div style="display: flex; gap: 1rem;">
+            <select id="filter-status" class="form-select" style="width: auto;" onchange="filterCases()">
+                <option value="">All Status</option>
+                <option value="Active">Active</option>
+                <option value="Pending">Pending</option>
+                <option value="Closed">Closed</option>
+                <option value="On Hold">On Hold</option>
+            </select>
+            <input type="text" id="search-cases" class="form-input" placeholder="Search cases..." 
+                   style="width: 300px;" oninput="searchCases()">
+        </div>
+    </div>
+    <div id="cases-table">
+        <div class="loading">
+            <div class="spinner"></div>
+            Loading cases...
+        </div>
+    </div>
+</div>
+
+<!-- Case Modal -->
+<div id="case-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 class="modal-title" id="modal-title">Add New Case</h2>
+            <button class="modal-close" onclick="closeCaseModal()">×</button>
+        </div>
+        <form id="case-form" onsubmit="submitCase(event)">
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label required">Case Number</label>
+                    <input type="text" name="case_number" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label required">Filing Date</label>
+                    <input type="date" name="filing_date" class="form-input" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label required">Case Title</label>
+                <input type="text" name="case_title" class="form-input" required>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label required">Case Type</label>
+                    <select name="case_type" class="form-select" required>
+                        <option value="">Select Type</option>
+                        <option value="Civil">Civil</option>
+                        <option value="Criminal">Criminal</option>
+                        <option value="Family">Family</option>
+                        <option value="Corporate">Corporate</option>
+                        <option value="Property">Property</option>
+                        <option value="Labour">Labour</option>
+                        <option value="Constitutional">Constitutional</option>
+                        <option value="Tax">Tax</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label required">Court Name</label>
+                    <input type="text" name="court_name" class="form-input" required 
+                           placeholder="e.g., District Court, High Court">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label required">Current Stage</label>
+                    <select name="current_stage" class="form-select" required>
+                        <option value="">Select Stage</option>
+                        <option value="Filed">Filed</option>
+                        <option value="Pleadings">Pleadings</option>
+                        <option value="Evidence">Evidence</option>
+                        <option value="Arguments">Arguments</option>
+                        <option value="Judgment Reserved">Judgment Reserved</option>
+                        <option value="Disposed">Disposed</option>
+                        <option value="Appeal">Appeal</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label required">Status</label>
+                    <select name="status" class="form-select" required>
+                        <option value="Active">Active</option>
+                        <option value="Pending">Pending</option>
+                        <option value="On Hold">On Hold</option>
+                        <option value="Closed">Closed</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label required">Client Name</label>
+                    <input type="text" name="client_name" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Client Contact</label>
+                    <input type="text" name="client_contact" class="form-input" 
+                           placeholder="Phone or Email">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Opponent Name</label>
+                    <input type="text" name="opponent_name" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Opponent's Advocate</label>
+                    <input type="text" name="opponent_advocate" class="form-input">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Priority</label>
+                <select name="case_priority" class="form-select">
+                    <option value="Low">Low</option>
+                    <option value="Medium" selected>Medium</option>
+                    <option value="High">High</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Notes</label>
+                <textarea name="notes" class="form-textarea" 
+                          placeholder="Any additional notes or remarks"></textarea>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeCaseModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Case</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Case Details Modal -->
+<div id="case-details-modal" class="modal">
+    <div class="modal-content" style="max-width: 1000px;">
+        <div class="modal-header">
+            <h2 class="modal-title" id="details-case-title">Case Details</h2>
+            <button class="modal-close" onclick="closeCaseDetailsModal()">×</button>
+        </div>
+        <div id="case-details-content"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let allCases = [];
+    let currentCaseId = null;
+
+    // Load cases
+    async function loadCases() {
+        try {
+            const response = await fetch('/api/cases');
+            allCases = await response.json();
+            renderCases(allCases);
+        } catch (error) {
+            console.error('Error loading cases:', error);
+            showNotification('Failed to load cases', 'error');
+        }
+    }
+
+    function renderCases(cases) {
+        const container = document.getElementById('cases-table');
+        
+        if (cases.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">📂</div>
+                    <div class="empty-state-text">No cases found</div>
+                    <p style="color: var(--text-secondary);">Add your first case to get started</p>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = `
+            <div class="table-container">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Case Number</th>
+                            <th>Case Title</th>
+                            <th>Client</th>
+                            <th>Court</th>
+                            <th>Current Stage</th>
+                            <th>Status</th>
+                            <th>Priority</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${cases.map(c => `
+                            <tr>
+                                <td><strong>${c.case_number}</strong></td>
+                                <td>${c.case_title}</td>
+                                <td>${c.client_name}</td>
+                                <td>${c.court_name}</td>
+                                <td>${c.current_stage}</td>
+                                <td><span class="badge badge-${getStatusClass(c.status)}">${c.status}</span></td>
+                                <td><span class="badge priority-${c.case_priority.toLowerCase()}">${c.case_priority}</span></td>
+                                <td>
+                                    <button class="btn btn-small btn-primary" onclick="viewCase(${c.id})">View</button>
+                                    <button class="btn btn-small btn-secondary" onclick="editCase(${c.id})">Edit</button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    function getStatusClass(status) {
+        const map = {
+            'Active': 'success',
+            'Pending': 'warning',
+            'Closed': 'secondary',
+            'On Hold': 'info'
+        };
+        return map[status] || 'secondary';
+    }
+
+    function filterCases() {
+        const status = document.getElementById('filter-status').value;
+        const searchTerm = document.getElementById('search-cases').value.toLowerCase();
+        
+        let filtered = allCases;
+        
+        if (status) {
+            filtered = filtered.filter(c => c.status === status);
+        }
+        
+        if (searchTerm) {
+            filtered = filtered.filter(c => 
+                c.case_number.toLowerCase().includes(searchTerm) ||
+                c.case_title.toLowerCase().includes(searchTerm) ||
+                c.client_name.toLowerCase().includes(searchTerm)
+            );
+        }
+        
+        renderCases(filtered);
+    }
+
+    function searchCases() {
+        filterCases();
+    }
+
+    // Modal functions
+    function openCaseModal(caseData = null) {
+        const modal = document.getElementById('case-modal');
+        const form = document.getElementById('case-form');
+        const title = document.getElementById('modal-title');
+        
+        form.reset();
+        currentCaseId = null;
+        
+        if (caseData) {
+            title.textContent = 'Edit Case';
+            currentCaseId = caseData.id;
+            
+            // Fill form with case data
+            Object.keys(caseData).forEach(key => {
+                const input = form.elements[key];
+                if (input) input.value = caseData[key] || '';
+            });
+            
+            // Disable case number editing
+            form.elements.case_number.disabled = true;
+        } else {
+            title.textContent = 'Add New Case';
+            form.elements.case_number.disabled = false;
+        }
+        
+        modal.classList.add('show');
+    }
+
+    function closeCaseModal() {
+        document.getElementById('case-modal').classList.remove('show');
+    }
+
+    async function submitCase(event) {
+        event.preventDefault();
+        
+        const form = event.target;
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData.entries());
+        
+        try {
+            const url = currentCaseId ? `/api/cases/${currentCaseId}` : '/api/cases';
+            const method = currentCaseId ? 'PUT' : 'POST';
+            
+            const response = await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok) {
+                showNotification(currentCaseId ? 'Case updated successfully' : 'Case added successfully', 'success');
+                closeCaseModal();
+                loadCases();
+            } else {
+                showNotification(result.error || 'Failed to save case', 'error');
+            }
+        } catch (error) {
+            console.error('Error saving case:', error);
+            showNotification('Failed to save case', 'error');
+        }
+    }
+
+    async function editCase(caseId) {
+        try {
+            const response = await fetch(`/api/cases/${caseId}`);
+            const data = await response.json();
+            openCaseModal(data.case);
+        } catch (error) {
+            console.error('Error loading case:', error);
+            showNotification('Failed to load case details', 'error');
+        }
+    }
+
+    async function viewCase(caseId) {
+        try {
+            const response = await fetch(`/api/cases/${caseId}`);
+            const data = await response.json();
+            
+            const modal = document.getElementById('case-details-modal');
+            const content = document.getElementById('case-details-content');
+            const titleEl = document.getElementById('details-case-title');
+            
+            const c = data.case;
+            titleEl.textContent = `${c.case_number}: ${c.case_title}`;
+            
+            content.innerHTML = `
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; margin-bottom: 2rem;">
+                    <div>
+                        <h3 style="margin-bottom: 1rem; color: var(--primary-color);">Case Information</h3>
+                        <p><strong>Case Type:</strong> ${c.case_type}</p>
+                        <p><strong>Court:</strong> ${c.court_name}</p>
+                        <p><strong>Filing Date:</strong> ${formatDate(c.filing_date)}</p>
+                        <p><strong>Current Stage:</strong> <span class="badge badge-info">${c.current_stage}</span></p>
+                        <p><strong>Status:</strong> <span class="badge badge-${getStatusClass(c.status)}">${c.status}</span></p>
+                        <p><strong>Priority:</strong> <span class="badge priority-${c.case_priority.toLowerCase()}">${c.case_priority}</span></p>
+                    </div>
+                    <div>
+                        <h3 style="margin-bottom: 1rem; color: var(--primary-color);">Parties</h3>
+                        <p><strong>Client:</strong> ${c.client_name}</p>
+                        ${c.client_contact ? `<p><strong>Contact:</strong> ${c.client_contact}</p>` : ''}
+                        ${c.opponent_name ? `<p><strong>Opponent:</strong> ${c.opponent_name}</p>` : ''}
+                        ${c.opponent_advocate ? `<p><strong>Opponent's Advocate:</strong> ${c.opponent_advocate}</p>` : ''}
+                    </div>
+                </div>
+
+                ${c.notes ? `
+                    <div style="margin-bottom: 2rem;">
+                        <h3 style="margin-bottom: 1rem; color: var(--primary-color);">Notes</h3>
+                        <p>${c.notes}</p>
+                    </div>
+                ` : ''}
+
+                <div style="margin-bottom: 2rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 style="color: var(--primary-color);">Hearings</h3>
+                        <button class="btn btn-small btn-primary" onclick="addHearing(${caseId})">Schedule Hearing</button>
+                    </div>
+                    ${data.hearings.length > 0 ? `
+                        <div class="table-container">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Time</th>
+                                        <th>Type</th>
+                                        <th>Purpose</th>
+                                        <th>Outcome</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${data.hearings.map(h => `
+                                        <tr>
+                                            <td>${formatDate(h.hearing_date)}</td>
+                                            <td>${h.hearing_time || '-'}</td>
+                                            <td>${h.hearing_type}</td>
+                                            <td>${h.purpose || '-'}</td>
+                                            <td>${h.outcome || '<span class="badge badge-warning">Pending</span>'}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    ` : '<p style="color: var(--text-secondary);">No hearings scheduled yet</p>'}
+                </div>
+
+                <div>
+                    <h3 style="margin-bottom: 1rem; color: var(--primary-color);">Case Timeline</h3>
+                    ${data.timeline.length > 0 ? `
+                        <div class="timeline">
+                            ${data.timeline.map(t => `
+                                <div class="timeline-item">
+                                    <div class="timeline-date">${formatDate(t.event_date)}</div>
+                                    <div class="timeline-event">${t.event_type}</div>
+                                    <div style="color: var(--text-secondary);">${t.description}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : '<p style="color: var(--text-secondary);">No timeline events yet</p>'}
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="closeCaseDetailsModal()">Close</button>
+                    <button class="btn btn-primary" onclick="editCase(${caseId}); closeCaseDetailsModal();">Edit Case</button>
+                </div>
+            `;
+            
+            modal.classList.add('show');
+        } catch (error) {
+            console.error('Error viewing case:', error);
+            showNotification('Failed to load case details', 'error');
+        }
+    }
+
+    function closeCaseDetailsModal() {
+        document.getElementById('case-details-modal').classList.remove('show');
+    }
+
+    function addHearing(caseId) {
+        closeCaseDetailsModal();
+        window.location.href = `/hearings?case_id=${caseId}`;
+    }
+
+    // Load cases on page load
+    document.addEventListener('DOMContentLoaded', loadCases);
+
+    // Close modals on outside click
+    window.onclick = function(event) {
+        const caseModal = document.getElementById('case-modal');
+        const detailsModal = document.getElementById('case-details-modal');
+        if (event.target === caseModal) {
+            closeCaseModal();
+        }
+        if (event.target === detailsModal) {
+            closeCaseDetailsModal();
+        }
+    }
+</script>
+{% endblock %}

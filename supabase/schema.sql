@@ -1,5 +1,5 @@
 -- ============================================
--- Mercury Clone - Database Schema
+-- LexQuant - Database Schema
 -- Run this in Supabase SQL Editor
 -- ============================================
 

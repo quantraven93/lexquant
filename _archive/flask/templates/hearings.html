@@ -1,0 +1,442 @@
+{% extends "base.html" %}
+
+{% block title %}Hearings - Legal Case Manager{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <h1 class="page-title">Hearings Calendar</h1>
+            <p class="page-subtitle">Manage hearing dates and schedules</p>
+        </div>
+        <button class="btn btn-primary" onclick="openHearingModal()">
+            ➕ Schedule Hearing
+        </button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Upcoming Hearings</h2>
+        <div style="display: flex; gap: 1rem;">
+            <select id="filter-days" class="form-select" style="width: auto;" onchange="filterHearings()">
+                <option value="7">Next 7 days</option>
+                <option value="14">Next 14 days</option>
+                <option value="30" selected>Next 30 days</option>
+                <option value="60">Next 60 days</option>
+                <option value="90">Next 90 days</option>
+            </select>
+        </div>
+    </div>
+    <div id="hearings-calendar">
+        <div class="loading">
+            <div class="spinner"></div>
+            Loading hearings...
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">All Hearings</h2>
+        <input type="text" id="search-hearings" class="form-input" placeholder="Search hearings..." 
+               style="width: 300px;" oninput="searchHearings()">
+    </div>
+    <div id="hearings-table">
+        <div class="loading">
+            <div class="spinner"></div>
+            Loading hearings...
+        </div>
+    </div>
+</div>
+
+<!-- Hearing Modal -->
+<div id="hearing-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 class="modal-title" id="modal-title">Schedule Hearing</h2>
+            <button class="modal-close" onclick="closeHearingModal()">×</button>
+        </div>
+        <form id="hearing-form" onsubmit="submitHearing(event)">
+            <div class="form-group">
+                <label class="form-label required">Case</label>
+                <select name="case_id" id="case-select" class="form-select" required>
+                    <option value="">Select Case</option>
+                </select>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label required">Hearing Date</label>
+                    <input type="date" name="hearing_date" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Hearing Time</label>
+                    <input type="time" name="hearing_time" class="form-input">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label required">Hearing Type</label>
+                    <select name="hearing_type" class="form-select" required>
+                        <option value="">Select Type</option>
+                        <option value="First Hearing">First Hearing</option>
+                        <option value="Regular Hearing">Regular Hearing</option>
+                        <option value="Evidence">Evidence</option>
+                        <option value="Arguments">Arguments</option>
+                        <option value="Final Arguments">Final Arguments</option>
+                        <option value="Judgment">Judgment</option>
+                        <option value="Mention">Mention</option>
+                        <option value="Miscellaneous">Miscellaneous</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Court Room</label>
+                    <input type="text" name="court_room" class="form-input" 
+                           placeholder="e.g., Court Room 1">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Purpose of Hearing</label>
+                <input type="text" name="purpose" class="form-input" 
+                       placeholder="e.g., Document submission, Cross-examination">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Judge Name</label>
+                <input type="text" name="judge_name" class="form-input">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Outcome (if completed)</label>
+                <textarea name="outcome" class="form-textarea" 
+                          placeholder="Enter the outcome if the hearing has been completed"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Next Hearing Date (if set)</label>
+                <input type="date" name="next_date" class="form-input">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Notes</label>
+                <textarea name="notes" class="form-textarea" 
+                          placeholder="Any additional notes or preparation required"></textarea>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeHearingModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Hearing</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let allHearings = [];
+    let allCases = [];
+    let currentHearingId = null;
+
+    // Load data
+    async function loadData() {
+        try {
+            // Load cases for dropdown
+            const casesResponse = await fetch('/api/cases');
+            allCases = await casesResponse.json();
+            populateCaseSelect();
+
+            // Load hearings
+            await loadHearings();
+            
+            // Check if we have a case_id in URL to pre-fill
+            const urlParams = new URLSearchParams(window.location.search);
+            const caseId = urlParams.get('case_id');
+            if (caseId) {
+                document.getElementById('case-select').value = caseId;
+                openHearingModal();
+            }
+        } catch (error) {
+            console.error('Error loading data:', error);
+            showNotification('Failed to load data', 'error');
+        }
+    }
+
+    async function loadHearings() {
+        try {
+            const response = await fetch('/api/hearings');
+            allHearings = await response.json();
+            filterHearings();
+            renderAllHearings();
+        } catch (error) {
+            console.error('Error loading hearings:', error);
+            showNotification('Failed to load hearings', 'error');
+        }
+    }
+
+    function populateCaseSelect() {
+        const select = document.getElementById('case-select');
+        const activeCases = allCases.filter(c => c.status === 'Active' || c.status === 'Pending');
+        
+        select.innerHTML = '<option value="">Select Case</option>' +
+            activeCases.map(c => 
+                `<option value="${c.id}">${c.case_number} - ${c.case_title}</option>`
+            ).join('');
+    }
+
+    function filterHearings() {
+        const days = parseInt(document.getElementById('filter-days').value);
+        const today = new Date();
+        const futureDate = new Date();
+        futureDate.setDate(today.getDate() + days);
+
+        const upcoming = allHearings.filter(h => {
+            const hDate = new Date(h.hearing_date);
+            return hDate >= today && hDate <= futureDate && !h.outcome;
+        });
+
+        renderUpcomingHearings(upcoming);
+    }
+
+    function renderUpcomingHearings(hearings) {
+        const container = document.getElementById('hearings-calendar');
+        
+        if (hearings.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">📅</div>
+                    <div class="empty-state-text">No upcoming hearings</div>
+                    <p style="color: var(--text-secondary);">Schedule your next hearing</p>
+                </div>
+            `;
+            return;
+        }
+
+        // Group by date
+        const byDate = {};
+        hearings.forEach(h => {
+            const date = h.hearing_date;
+            if (!byDate[date]) byDate[date] = [];
+            byDate[date].push(h);
+        });
+
+        container.innerHTML = Object.keys(byDate).sort().map(date => {
+            const daysLeft = daysUntil(date);
+            const urgencyClass = daysLeft <= 2 ? 'danger' : daysLeft <= 7 ? 'warning' : 'info';
+            const dateLabel = daysLeft === 0 ? 'Today' : 
+                            daysLeft === 1 ? 'Tomorrow' : 
+                            formatDate(date);
+
+            return `
+                <div style="margin-bottom: 2rem;">
+                    <h3 style="margin-bottom: 1rem; color: var(--primary-color); display: flex; align-items: center; gap: 1rem;">
+                        ${dateLabel}
+                        <span class="badge badge-${urgencyClass}">${daysLeft === 0 ? 'Today' : daysLeft === 1 ? 'Tomorrow' : daysLeft + ' days'}</span>
+                    </h3>
+                    ${byDate[date].map(h => `
+                        <div class="hearing-item">
+                            <div style="display: flex; justify-content: space-between; align-items: start;">
+                                <div style="flex: 1;">
+                                    <div class="hearing-case">
+                                        ${h.case_number}: ${h.case_title}
+                                        ${h.hearing_time ? ` • ${h.hearing_time}` : ''}
+                                    </div>
+                                    <div class="hearing-details">
+                                        ${h.court_name} 
+                                        ${h.court_room ? ` • ${h.court_room}` : ''}
+                                        • ${h.hearing_type}
+                                        ${h.purpose ? ` • ${h.purpose}` : ''}
+                                    </div>
+                                    ${h.judge_name ? `<div class="hearing-details">👨‍⚖️ ${h.judge_name}</div>` : ''}
+                                    ${h.notes ? `<div style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.9rem;">📝 ${h.notes}</div>` : ''}
+                                </div>
+                                <button class="btn btn-small btn-primary" onclick="editHearing(${h.id})">Edit</button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }).join('');
+    }
+
+    function renderAllHearings() {
+        const container = document.getElementById('hearings-table');
+        
+        if (allHearings.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">📅</div>
+                    <div class="empty-state-text">No hearings scheduled</div>
+                    <p style="color: var(--text-secondary);">Schedule your first hearing</p>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = `
+            <div class="table-container">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Time</th>
+                            <th>Case</th>
+                            <th>Type</th>
+                            <th>Court</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${allHearings.map(h => {
+                            const isPast = new Date(h.hearing_date) < new Date();
+                            const status = h.outcome ? 'Completed' : isPast ? 'Missed' : 'Scheduled';
+                            const statusClass = h.outcome ? 'success' : isPast ? 'danger' : 'info';
+                            
+                            return `
+                                <tr>
+                                    <td><strong>${formatDate(h.hearing_date)}</strong></td>
+                                    <td>${h.hearing_time || '-'}</td>
+                                    <td>${h.case_number}</td>
+                                    <td>${h.hearing_type}</td>
+                                    <td>${h.court_name}</td>
+                                    <td><span class="badge badge-${statusClass}">${status}</span></td>
+                                    <td>
+                                        <button class="btn btn-small btn-secondary" onclick="editHearing(${h.id})">Edit</button>
+                                        <button class="btn btn-small btn-danger" onclick="deleteHearing(${h.id})">Delete</button>
+                                    </td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    function searchHearings() {
+        const searchTerm = document.getElementById('search-hearings').value.toLowerCase();
+        
+        const filtered = allHearings.filter(h => 
+            h.case_number.toLowerCase().includes(searchTerm) ||
+            h.case_title.toLowerCase().includes(searchTerm) ||
+            h.hearing_type.toLowerCase().includes(searchTerm)
+        );
+        
+        // Update the all hearings table
+        const container = document.getElementById('hearings-table');
+        if (filtered.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">🔍</div>
+                    <div class="empty-state-text">No hearings found</div>
+                </div>
+            `;
+        } else {
+            allHearings = filtered;
+            renderAllHearings();
+        }
+    }
+
+    // Modal functions
+    function openHearingModal(hearingData = null) {
+        const modal = document.getElementById('hearing-modal');
+        const form = document.getElementById('hearing-form');
+        const title = document.getElementById('modal-title');
+        
+        form.reset();
+        currentHearingId = null;
+        
+        if (hearingData) {
+            title.textContent = 'Edit Hearing';
+            currentHearingId = hearingData.id;
+            
+            Object.keys(hearingData).forEach(key => {
+                const input = form.elements[key];
+                if (input) input.value = hearingData[key] || '';
+            });
+        } else {
+            title.textContent = 'Schedule Hearing';
+        }
+        
+        modal.classList.add('show');
+    }
+
+    function closeHearingModal() {
+        document.getElementById('hearing-modal').classList.remove('show');
+    }
+
+    async function submitHearing(event) {
+        event.preventDefault();
+        
+        const form = event.target;
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData.entries());
+        
+        try {
+            const url = currentHearingId ? `/api/hearings/${currentHearingId}` : '/api/hearings';
+            const method = currentHearingId ? 'PUT' : 'POST';
+            
+            const response = await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            
+            if (response.ok) {
+                showNotification(currentHearingId ? 'Hearing updated successfully' : 'Hearing scheduled successfully', 'success');
+                closeHearingModal();
+                loadHearings();
+            } else {
+                showNotification('Failed to save hearing', 'error');
+            }
+        } catch (error) {
+            console.error('Error saving hearing:', error);
+            showNotification('Failed to save hearing', 'error');
+        }
+    }
+
+    async function editHearing(hearingId) {
+        const hearing = allHearings.find(h => h.id === hearingId);
+        if (hearing) {
+            openHearingModal(hearing);
+        }
+    }
+
+    async function deleteHearing(hearingId) {
+        if (!confirm('Are you sure you want to delete this hearing?')) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/api/hearings/${hearingId}`, {
+                method: 'DELETE'
+            });
+            
+            if (response.ok) {
+                showNotification('Hearing deleted successfully', 'success');
+                loadHearings();
+            } else {
+                showNotification('Failed to delete hearing', 'error');
+            }
+        } catch (error) {
+            console.error('Error deleting hearing:', error);
+            showNotification('Failed to delete hearing', 'error');
+        }
+    }
+
+    // Load data on page load
+    document.addEventListener('DOMContentLoaded', loadData);
+
+    // Close modal on outside click
+    window.onclick = function(event) {
+        const modal = document.getElementById('hearing-modal');
+        if (event.target === modal) {
+            closeHearingModal();
+        }
+    }
+</script>
+{% endblock %}

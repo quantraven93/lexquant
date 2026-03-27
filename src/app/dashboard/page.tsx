@@ -49,29 +49,42 @@ export default function DashboardPage() {
     return d >= now && d <= weekFromNow;
   }).length;
 
+  const today = new Date().toLocaleDateString("en-US", {
+    weekday: "short",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+
   return (
     <DashboardShell>
-      <div className="p-6 space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Track and manage your court cases
-          </p>
+      <div style={{ display: "flex", flexDirection: "column", gap: "1px", background: "var(--bb-border)", minHeight: "100%" }}>
+        {/* Header */}
+        <div className="bb-panel-header">
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <span className="bb-panel-title">CASE DASHBOARD</span>
+            <span className="live-dot" />
+          </div>
+          <span style={{ fontSize: "0.6rem", color: "var(--bb-gray)", letterSpacing: "0.05em" }}>{today}</span>
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "16rem", background: "var(--bb-panel)" }}>
+            <span style={{ color: "var(--bb-amber)", fontSize: "0.75rem", letterSpacing: "0.1em", fontWeight: 600 }}>[LOADING DATA...]</span>
           </div>
         ) : (
           <>
-            <StatsCards
-              total={totalCases}
-              pending={pendingCases}
-              upcomingThisWeek={upcomingHearings}
-              disposed={disposedCases}
-            />
-            <CaseTable cases={cases} />
+            <div style={{ background: "var(--bb-panel)" }}>
+              <StatsCards
+                total={totalCases}
+                pending={pendingCases}
+                upcomingThisWeek={upcomingHearings}
+                disposed={disposedCases}
+              />
+            </div>
+            <div style={{ background: "var(--bb-panel)" }}>
+              <CaseTable cases={cases} />
+            </div>
           </>
         )}
       </div>

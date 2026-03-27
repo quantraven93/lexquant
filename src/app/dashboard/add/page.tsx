@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { DashboardShell } from "@/components/DashboardShell";
 import { COURT_TYPES, INDIAN_STATES } from "@/lib/utils";
-import { PlusCircle, Hash, FileText } from "lucide-react";
 
 export default function AddCasePage() {
   const [mode, setMode] = useState<"case_number" | "cnr">("case_number");
@@ -56,162 +55,154 @@ export default function AddCasePage() {
 
   return (
     <DashboardShell>
-      <div className="p-6 max-w-2xl">
-        <h1 className="text-2xl font-bold text-gray-900">Add Case</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Add a case to track by entering its details
-        </p>
+      <div style={{ maxWidth: "640px", padding: "1rem" }}>
+        {/* Header */}
+        <div className="bb-panel-header" style={{ marginBottom: "1px" }}>
+          <span className="bb-panel-title">ADD CASE TO WATCHLIST</span>
+        </div>
 
-        <div className="mt-6 bg-white rounded-xl border border-gray-200 p-6">
-          {/* Mode toggle */}
-          <div className="flex gap-2 mb-6">
+        <div className="bb-panel">
+          {/* Mode toggle tabs */}
+          <div className="bb-tabs">
             <button
               onClick={() => setMode("case_number")}
-              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                mode === "case_number"
-                  ? "bg-indigo-100 text-indigo-700"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
+              className={`bb-tab ${mode === "case_number" ? "active" : ""}`}
             >
-              <Hash className="w-4 h-4" />
-              By Case Number
+              [CASE NUMBER]
             </button>
             <button
               onClick={() => setMode("cnr")}
-              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                mode === "cnr"
-                  ? "bg-indigo-100 text-indigo-700"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
+              className={`bb-tab ${mode === "cnr" ? "active" : ""}`}
             >
-              <FileText className="w-4 h-4" />
-              By CNR Number
+              [CNR NUMBER]
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {mode === "cnr" ? (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  CNR Number
-                </label>
-                <input
-                  type="text"
-                  value={cnrNumber}
-                  onChange={(e) => setCnrNumber(e.target.value.toUpperCase())}
-                  placeholder="e.g., DLCT010012345"
-                  required
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-gray-900 bg-white placeholder:text-gray-400"
-                />
-                <p className="text-xs text-gray-400 mt-1">
-                  16-character unique case number from eCourts
-                </p>
-              </div>
-            ) : (
-              <>
+          <div className="bb-panel-body" style={{ padding: "0.75rem" }}>
+            <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              {mode === "cnr" ? (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Court Type
+                  <label style={{ display: "block", fontSize: "0.6rem", color: "var(--bb-gray)", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600, marginBottom: "0.3rem" }}>
+                    CNR NUMBER
                   </label>
-                  <select
-                    value={courtType}
-                    onChange={(e) => setCourtType(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-gray-900 bg-white appearance-auto"
-                  >
-                    {COURT_TYPES.map((ct) => (
-                      <option key={ct.value} value={ct.value}>
-                        {ct.label}
-                      </option>
-                    ))}
-                  </select>
+                  <input
+                    type="text"
+                    value={cnrNumber}
+                    onChange={(e) => setCnrNumber(e.target.value.toUpperCase())}
+                    placeholder="e.g., DLCT010012345"
+                    required
+                    style={{ width: "100%", boxSizing: "border-box" }}
+                  />
+                  <p style={{ fontSize: "0.6rem", color: "var(--bb-gray-dim)", marginTop: "0.25rem" }}>
+                    16-character unique case number from eCourts
+                  </p>
                 </div>
-
-                {showStateSelector && (
+              ) : (
+                <>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      State
+                    <label style={{ display: "block", fontSize: "0.6rem", color: "var(--bb-gray)", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600, marginBottom: "0.3rem" }}>
+                      COURT TYPE
                     </label>
                     <select
-                      value={stateCode}
-                      onChange={(e) => setStateCode(e.target.value)}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-gray-900 bg-white appearance-auto"
+                      value={courtType}
+                      onChange={(e) => setCourtType(e.target.value)}
+                      style={{ width: "100%", boxSizing: "border-box" }}
                     >
-                      <option value="">Select State</option>
-                      {INDIAN_STATES.map((s) => (
-                        <option key={s.code} value={s.code}>
-                          {s.name}
+                      {COURT_TYPES.map((ct) => (
+                        <option key={ct.value} value={ct.value}>
+                          {ct.label}
                         </option>
                       ))}
                     </select>
                   </div>
-                )}
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Case Type
-                  </label>
-                  <input
-                    type="text"
-                    value={caseType}
-                    onChange={(e) => setCaseType(e.target.value)}
-                    placeholder="e.g., Civil Appeal, Writ Petition, SLP"
-                    required
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-gray-900 bg-white placeholder:text-gray-400"
-                  />
-                </div>
+                  {showStateSelector && (
+                    <div>
+                      <label style={{ display: "block", fontSize: "0.6rem", color: "var(--bb-gray)", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600, marginBottom: "0.3rem" }}>
+                        STATE
+                      </label>
+                      <select
+                        value={stateCode}
+                        onChange={(e) => setStateCode(e.target.value)}
+                        style={{ width: "100%", boxSizing: "border-box" }}
+                      >
+                        <option value="">Select State</option>
+                        {INDIAN_STATES.map((s) => (
+                          <option key={s.code} value={s.code}>
+                            {s.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
-                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Case Number
+                    <label style={{ display: "block", fontSize: "0.6rem", color: "var(--bb-gray)", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600, marginBottom: "0.3rem" }}>
+                      CASE TYPE
                     </label>
                     <input
                       type="text"
-                      value={caseNumber}
-                      onChange={(e) => setCaseNumber(e.target.value)}
-                      placeholder="e.g., 1234"
+                      value={caseType}
+                      onChange={(e) => setCaseType(e.target.value)}
+                      placeholder="e.g., Civil Appeal, Writ Petition, SLP"
                       required
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-gray-900 bg-white placeholder:text-gray-400"
+                      style={{ width: "100%", boxSizing: "border-box" }}
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Year
-                    </label>
-                    <input
-                      type="text"
-                      value={caseYear}
-                      onChange={(e) => setCaseYear(e.target.value)}
-                      placeholder="e.g., 2024"
-                      required
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-gray-900 bg-white placeholder:text-gray-400"
-                    />
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                    <div>
+                      <label style={{ display: "block", fontSize: "0.6rem", color: "var(--bb-gray)", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600, marginBottom: "0.3rem" }}>
+                        CASE NUMBER
+                      </label>
+                      <input
+                        type="text"
+                        value={caseNumber}
+                        onChange={(e) => setCaseNumber(e.target.value)}
+                        placeholder="e.g., 1234"
+                        required
+                        style={{ width: "100%", boxSizing: "border-box" }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: "block", fontSize: "0.6rem", color: "var(--bb-gray)", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600, marginBottom: "0.3rem" }}>
+                        YEAR
+                      </label>
+                      <input
+                        type="text"
+                        value={caseYear}
+                        onChange={(e) => setCaseYear(e.target.value)}
+                        placeholder="e.g., 2024"
+                        required
+                        style={{ width: "100%", boxSizing: "border-box" }}
+                      />
+                    </div>
                   </div>
+                </>
+              )}
+
+              {error && (
+                <div style={{ padding: "0.5rem 0.75rem", border: "1px solid var(--bb-red)", background: "rgba(255,59,59,0.05)", fontSize: "0.78rem", color: "var(--bb-red)" }}>
+                  {error}
                 </div>
-              </>
-            )}
+              )}
 
-            {error && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
-                {error}
-              </div>
-            )}
+              {success && (
+                <div style={{ padding: "0.5rem 0.75rem", border: "1px solid var(--bb-green)", background: "rgba(0,210,106,0.05)", fontSize: "0.78rem", color: "var(--bb-green)" }}>
+                  {success}
+                </div>
+              )}
 
-            {success && (
-              <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-600">
-                {success}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full flex items-center justify-center gap-2 py-3 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-400 text-white font-medium rounded-lg transition-colors"
-            >
-              <PlusCircle className="w-5 h-5" />
-              {loading ? "Adding Case..." : "Add Case"}
-            </button>
-          </form>
+              <button
+                type="submit"
+                disabled={loading}
+                className="bb-btn bb-btn-primary"
+                style={{ width: "100%", opacity: loading ? 0.6 : 1, cursor: loading ? "not-allowed" : "pointer" }}
+              >
+                {loading ? "[ADDING...]" : "[+ ADD TO WATCHLIST]"}
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     </DashboardShell>

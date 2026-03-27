@@ -4,18 +4,6 @@ import { useEffect, useState, use } from "react";
 import { DashboardShell } from "@/components/DashboardShell";
 import { cn, COURT_TYPE_COLORS, STATUS_COLORS } from "@/lib/utils";
 import { format } from "date-fns";
-import {
-  ArrowLeft,
-  Calendar,
-  User,
-  Gavel,
-  FileText,
-  Tag,
-  Clock,
-  Save,
-  Trash2,
-  Sparkles,
-} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -138,8 +126,8 @@ export default function CaseDetailPage({
   if (loading) {
     return (
       <DashboardShell>
-        <div className="flex items-center justify-center h-full">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
+          <span style={{ color: "var(--bb-amber)", fontSize: "0.75rem", letterSpacing: "0.1em", fontWeight: 600 }}>[LOADING CASE...]</span>
         </div>
       </DashboardShell>
     );
@@ -148,10 +136,10 @@ export default function CaseDetailPage({
   if (!caseData) {
     return (
       <DashboardShell>
-        <div className="p-6">
-          <p className="text-gray-500">Case not found.</p>
-          <Link href="/dashboard" className="text-indigo-600 mt-2 inline-block">
-            Back to Dashboard
+        <div style={{ padding: "1rem" }}>
+          <p style={{ color: "var(--bb-gray)", fontSize: "0.78rem" }}>Case not found.</p>
+          <Link href="/dashboard" style={{ color: "var(--bb-amber)", fontSize: "0.78rem", textDecoration: "none", marginTop: "0.5rem", display: "inline-block" }}>
+            &lt; BACK TO DASHBOARD
           </Link>
         </div>
       </DashboardShell>
@@ -160,288 +148,297 @@ export default function CaseDetailPage({
 
   return (
     <DashboardShell>
-      <div className="p-6 max-w-4xl space-y-6">
+      <div style={{ maxWidth: "900px", display: "flex", flexDirection: "column", gap: "1px", background: "var(--bb-border)", padding: "0" }}>
         {/* Header */}
-        <div className="flex items-start justify-between">
-          <div>
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-2"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back
-            </Link>
-            <h1 className="text-2xl font-bold text-gray-900">
-              {caseData.case_title ||
-                `${caseData.case_number}/${caseData.case_year}`}
-            </h1>
-            <div className="flex items-center gap-3 mt-2">
-              <span
-                className={cn(
-                  "inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full",
-                  COURT_TYPE_COLORS[caseData.court_type] || "bg-gray-100"
-                )}
-              >
-                {caseData.court_type}
-              </span>
-              <span
-                className={cn(
-                  "inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full",
-                  STATUS_COLORS[caseData.current_status || "Unknown"] ||
-                    "bg-gray-100"
-                )}
-              >
-                {caseData.current_status || "Unknown"}
-              </span>
-              {caseData.cnr_number && (
-                <span className="text-xs text-gray-400">
-                  CNR: {caseData.cnr_number}
-                </span>
-              )}
-            </div>
-          </div>
-          <button
-            onClick={deleteCase}
-            className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-            title="Remove from tracking"
+        <div style={{ background: "var(--bb-panel)", padding: "0.6rem 0.75rem" }}>
+          <Link
+            href="/dashboard"
+            style={{ color: "var(--bb-amber)", fontSize: "0.68rem", textDecoration: "none", fontWeight: 600, letterSpacing: "0.05em" }}
           >
-            <Trash2 className="w-5 h-5" />
-          </button>
+            &lt; BACK
+          </Link>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginTop: "0.4rem" }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <h1 style={{ fontSize: "1.1rem", color: "var(--bb-amber)", fontFamily: "var(--bb-font)", fontWeight: 700, margin: 0, lineHeight: 1.3 }}>
+                {caseData.case_title ||
+                  `${caseData.case_number}/${caseData.case_year}`}
+              </h1>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.35rem", flexWrap: "wrap" }}>
+                <span
+                  className={cn(
+                    "inline-flex px-2 py-0.5 text-xs font-medium",
+                    COURT_TYPE_COLORS[caseData.court_type] || "bg-gray-800/50 text-gray-500"
+                  )}
+                  style={{ fontSize: "0.6rem" }}
+                >
+                  {caseData.court_type}
+                </span>
+                <span
+                  className={cn(
+                    "inline-flex px-2 py-0.5 text-xs font-medium",
+                    STATUS_COLORS[caseData.current_status || "Unknown"] ||
+                      "bg-gray-800/50 text-gray-500"
+                  )}
+                  style={{ fontSize: "0.6rem" }}
+                >
+                  {caseData.current_status || "Unknown"}
+                </span>
+                {caseData.cnr_number && (
+                  <span style={{ fontSize: "0.6rem", color: "var(--bb-gray)" }}>
+                    CNR: {caseData.cnr_number}
+                  </span>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={deleteCase}
+              className="bb-btn bb-btn-danger"
+              style={{ padding: "0.3rem 0.6rem", fontSize: "0.6rem", flexShrink: 0, marginLeft: "0.5rem" }}
+            >
+              [DEL]
+            </button>
+          </div>
         </div>
 
         {/* AI Summary */}
-        <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border border-indigo-200 p-5">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-indigo-900 flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-indigo-500" />
-              AI Case Summary
-            </h2>
+        <div className="bb-panel">
+          <div className="bb-panel-header">
+            <span className="bb-panel-title">AI ANALYSIS</span>
             <button
               onClick={generateSummary}
               disabled={summarizing}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 disabled:bg-indigo-400 transition-colors"
+              className="bb-btn bb-btn-primary"
+              style={{ padding: "0.2rem 0.6rem", fontSize: "0.58rem", opacity: summarizing ? 0.6 : 1 }}
             >
-              <Sparkles className="w-3 h-3" />
               {summarizing
-                ? "Generating..."
+                ? "[GENERATING...]"
                 : aiSummary
-                ? "Regenerate"
-                : "Generate Summary"}
+                ? "[REGENERATE]"
+                : "[GENERATE SUMMARY]"}
             </button>
           </div>
-          {aiSummary ? (
-            <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
-              {aiSummary}
-            </p>
-          ) : (
-            <p className="text-sm text-indigo-400">
-              Click &quot;Generate Summary&quot; to get an AI-powered overview of
-              this case.
-            </p>
-          )}
+          <div className="bb-panel-body">
+            {aiSummary ? (
+              <p style={{ fontSize: "0.78rem", color: "var(--bb-white)", lineHeight: 1.6, whiteSpace: "pre-line" }}>
+                {aiSummary}
+              </p>
+            ) : (
+              <p style={{ fontSize: "0.78rem", color: "var(--bb-gray)" }}>
+                Click &quot;Generate Summary&quot; to get an AI-powered overview of this case.
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Info Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <InfoCard
-            icon={<Calendar className="w-5 h-5 text-blue-500" />}
-            label="Next Hearing"
-            value={
-              caseData.next_hearing_date
-                ? format(new Date(caseData.next_hearing_date), "dd MMM yyyy")
-                : "Not scheduled"
-            }
-          />
-          <InfoCard
-            icon={<FileText className="w-5 h-5 text-green-500" />}
-            label="Last Order"
-            value={
-              caseData.last_order_date
-                ? `${format(new Date(caseData.last_order_date), "dd MMM yyyy")}${caseData.last_order_summary ? ` - ${caseData.last_order_summary}` : ""}`
-                : "No orders"
-            }
-          />
-          <InfoCard
-            icon={<Gavel className="w-5 h-5 text-purple-500" />}
-            label="Judges"
-            value={caseData.judges || "Not available"}
-          />
-          <InfoCard
-            icon={<Clock className="w-5 h-5 text-gray-500" />}
-            label="Filing Date"
-            value={
-              caseData.filing_date
-                ? format(new Date(caseData.filing_date), "dd MMM yyyy")
-                : "Not available"
-            }
-          />
+        <div className="bb-panel">
+          <div className="bb-panel-header">
+            <span className="bb-panel-title">CASE INFO</span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1px", background: "var(--bb-border)" }}>
+            <div style={{ background: "var(--bb-panel)", padding: "0.5rem 0.75rem" }}>
+              <div className="bb-kv-label">NEXT HEARING</div>
+              <div className="bb-kv-value" style={{ marginTop: "0.15rem" }}>
+                {caseData.next_hearing_date
+                  ? format(new Date(caseData.next_hearing_date), "dd MMM yyyy")
+                  : "Not scheduled"}
+              </div>
+            </div>
+            <div style={{ background: "var(--bb-panel)", padding: "0.5rem 0.75rem" }}>
+              <div className="bb-kv-label">LAST ORDER</div>
+              <div className="bb-kv-value" style={{ marginTop: "0.15rem" }}>
+                {caseData.last_order_date
+                  ? format(new Date(caseData.last_order_date), "dd MMM yyyy")
+                  : "No orders"}
+              </div>
+              {caseData.last_order_summary && (
+                <div style={{ fontSize: "0.6rem", color: "var(--bb-gray)", marginTop: "0.15rem" }}>{caseData.last_order_summary}</div>
+              )}
+            </div>
+            <div style={{ background: "var(--bb-panel)", padding: "0.5rem 0.75rem" }}>
+              <div className="bb-kv-label">BENCH</div>
+              <div className="bb-kv-value" style={{ marginTop: "0.15rem" }}>
+                {caseData.judges || "Not available"}
+              </div>
+            </div>
+            <div style={{ background: "var(--bb-panel)", padding: "0.5rem 0.75rem" }}>
+              <div className="bb-kv-label">FILING DATE</div>
+              <div className="bb-kv-value" style={{ marginTop: "0.15rem" }}>
+                {caseData.filing_date
+                  ? format(new Date(caseData.filing_date), "dd MMM yyyy")
+                  : "Not available"}
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Parties */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <h2 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <User className="w-4 h-4" />
-            Parties
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <p className="text-xs text-gray-500 uppercase tracking-wider">
-                Petitioner
-              </p>
-              <p className="text-sm text-gray-900 mt-1">
+        <div className="bb-panel">
+          <div className="bb-panel-header">
+            <span className="bb-panel-title">PARTIES</span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1px", background: "var(--bb-border)" }}>
+            <div style={{ background: "var(--bb-panel)", padding: "0.5rem 0.75rem" }}>
+              <div className="bb-kv-label">PETITIONER</div>
+              <div style={{ fontSize: "0.82rem", color: "var(--bb-white)", marginTop: "0.2rem" }}>
                 {caseData.petitioner || "-"}
-              </p>
+              </div>
               {caseData.petitioner_advocate && (
-                <p className="text-xs text-gray-500 mt-0.5">
+                <div style={{ fontSize: "0.6rem", color: "var(--bb-gray)", marginTop: "0.15rem" }}>
                   Adv. {caseData.petitioner_advocate}
-                </p>
+                </div>
               )}
             </div>
-            <div>
-              <p className="text-xs text-gray-500 uppercase tracking-wider">
-                Respondent
-              </p>
-              <p className="text-sm text-gray-900 mt-1">
+            <div style={{ background: "var(--bb-panel)", padding: "0.5rem 0.75rem" }}>
+              <div className="bb-kv-label">RESPONDENT</div>
+              <div style={{ fontSize: "0.82rem", color: "var(--bb-white)", marginTop: "0.2rem" }}>
                 {caseData.respondent || "-"}
-              </p>
+              </div>
               {caseData.respondent_advocate && (
-                <p className="text-xs text-gray-500 mt-0.5">
+                <div style={{ fontSize: "0.6rem", color: "var(--bb-gray)", marginTop: "0.15rem" }}>
                   Adv. {caseData.respondent_advocate}
-                </p>
+                </div>
               )}
             </div>
           </div>
         </div>
 
-        {/* Tags */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <h2 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-            <Tag className="w-4 h-4" />
-            Tags
-          </h2>
-          <div className="flex flex-wrap gap-2 mb-3">
-            {(caseData.tags || []).map((tag) => (
-              <span
-                key={tag}
-                className="inline-flex items-center gap-1 px-3 py-1 bg-indigo-50 text-indigo-700 text-sm rounded-full"
-              >
-                {tag}
-                <button
-                  onClick={() => removeTag(tag)}
-                  className="text-indigo-400 hover:text-indigo-700"
-                >
-                  x
-                </button>
-              </span>
-            ))}
+        {/* Tags / Classification */}
+        <div className="bb-panel">
+          <div className="bb-panel-header">
+            <span className="bb-panel-title">CLASSIFICATION</span>
           </div>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={tagInput}
-              onChange={(e) => setTagInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addTag())}
-              placeholder="Add tag..."
-              className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-            <button
-              onClick={addTag}
-              className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-500"
-            >
-              Add
-            </button>
+          <div className="bb-panel-body">
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem", marginBottom: "0.5rem" }}>
+              {(caseData.tags || []).map((tag) => (
+                <span
+                  key={tag}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "0.3rem",
+                    padding: "0.2rem 0.5rem",
+                    border: "1px solid var(--bb-amber)",
+                    color: "var(--bb-amber)",
+                    fontSize: "0.65rem",
+                    fontWeight: 600,
+                    letterSpacing: "0.04em",
+                  }}
+                >
+                  {tag}
+                  <button
+                    onClick={() => removeTag(tag)}
+                    style={{ background: "none", border: "none", color: "var(--bb-amber-dim)", cursor: "pointer", fontSize: "0.7rem", padding: 0, lineHeight: 1 }}
+                  >
+                    x
+                  </button>
+                </span>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: "0.4rem" }}>
+              <input
+                type="text"
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addTag())}
+                placeholder="Add tag..."
+                style={{ flex: 1 }}
+              />
+              <button
+                onClick={addTag}
+                className="bb-btn bb-btn-primary"
+                style={{ padding: "0.35rem 0.75rem", fontSize: "0.6rem" }}
+              >
+                [ADD]
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Notes */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <h2 className="text-sm font-semibold text-gray-900 mb-3">Notes</h2>
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            rows={4}
-            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
-            placeholder="Add notes about this case..."
-          />
-          <button
-            onClick={saveNotes}
-            disabled={saving}
-            className="mt-2 inline-flex items-center gap-2 px-4 py-2 text-sm bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:bg-gray-400"
-          >
-            <Save className="w-4 h-4" />
-            {saving ? "Saving..." : "Save Notes"}
-          </button>
+        <div className="bb-panel">
+          <div className="bb-panel-header">
+            <span className="bb-panel-title">NOTES</span>
+          </div>
+          <div className="bb-panel-body">
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={4}
+              style={{ width: "100%", boxSizing: "border-box", resize: "none", fontFamily: "var(--bb-font)" }}
+              placeholder="Add notes about this case..."
+            />
+            <button
+              onClick={saveNotes}
+              disabled={saving}
+              className="bb-btn bb-btn-primary"
+              style={{ marginTop: "0.4rem", opacity: saving ? 0.6 : 1 }}
+            >
+              {saving ? "[SAVING...]" : "[SAVE]"}
+            </button>
+          </div>
         </div>
 
         {/* Update History */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <h2 className="text-sm font-semibold text-gray-900 mb-4">
-            Update History
-          </h2>
-          {updates.length === 0 ? (
-            <p className="text-sm text-gray-500">No updates yet.</p>
-          ) : (
-            <div className="space-y-3">
-              {updates.map((u) => (
-                <div
-                  key={u.id}
-                  className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg"
-                >
-                  <div className="w-2 h-2 rounded-full bg-indigo-500 mt-2 shrink-0"></div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900">
-                      {u.update_type.replace(/_/g, " ")}
-                    </p>
-                    {u.old_value && (
-                      <p className="text-xs text-gray-500">
-                        From: {u.old_value}
-                      </p>
-                    )}
-                    {u.new_value && (
-                      <p className="text-xs text-gray-700">
-                        To: {u.new_value}
-                      </p>
-                    )}
-                    <p className="text-xs text-gray-400 mt-1">
+        <div className="bb-panel">
+          <div className="bb-panel-header">
+            <span className="bb-panel-title">UPDATE LOG</span>
+            <span className="bb-panel-tag">{updates.length}</span>
+          </div>
+          <div className="bb-panel-body">
+            {updates.length === 0 ? (
+              <p style={{ fontSize: "0.78rem", color: "var(--bb-gray)" }}>No updates yet.</p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                {updates.map((u) => (
+                  <div
+                    key={u.id}
+                    style={{
+                      fontFamily: "var(--bb-font)",
+                      fontSize: "0.72rem",
+                      color: "var(--bb-white)",
+                      padding: "0.3rem 0",
+                      borderBottom: "1px solid rgba(26,32,48,0.5)",
+                    }}
+                  >
+                    <span style={{ color: "var(--bb-amber)" }}>&gt; </span>
+                    <span style={{ color: "var(--bb-gray)" }}>
                       {format(new Date(u.created_at), "dd MMM yyyy, HH:mm")}
-                    </p>
+                    </span>
+                    <span style={{ color: "var(--bb-gray-dim)" }}> | </span>
+                    <span style={{ color: "var(--bb-amber)", fontWeight: 600 }}>
+                      {u.update_type.replace(/_/g, " ").toUpperCase()}
+                    </span>
+                    {(u.old_value || u.new_value) && (
+                      <>
+                        <span style={{ color: "var(--bb-gray-dim)" }}> | </span>
+                        {u.old_value && (
+                          <span style={{ color: "var(--bb-red)" }}>{u.old_value}</span>
+                        )}
+                        {u.old_value && u.new_value && (
+                          <span style={{ color: "var(--bb-gray-dim)" }}> &rarr; </span>
+                        )}
+                        {u.new_value && (
+                          <span style={{ color: "var(--bb-green)" }}>{u.new_value}</span>
+                        )}
+                      </>
+                    )}
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Last checked */}
         {caseData.last_checked_at && (
-          <p className="text-xs text-gray-400 text-center">
-            Last checked:{" "}
-            {format(new Date(caseData.last_checked_at), "dd MMM yyyy, HH:mm")}
-          </p>
+          <div style={{ background: "var(--bb-panel)", padding: "0.4rem 0.75rem", textAlign: "center" }}>
+            <span style={{ fontSize: "0.6rem", color: "var(--bb-gray)" }}>
+              LAST CHECKED: {format(new Date(caseData.last_checked_at), "dd MMM yyyy, HH:mm")}
+            </span>
+          </div>
         )}
       </div>
     </DashboardShell>
-  );
-}
-
-function InfoCard({
-  icon,
-  label,
-  value,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-start gap-3">
-      <div className="mt-0.5">{icon}</div>
-      <div>
-        <p className="text-xs text-gray-500 uppercase tracking-wider">
-          {label}
-        </p>
-        <p className="text-sm text-gray-900 mt-0.5">{value}</p>
-      </div>
-    </div>
   );
 }

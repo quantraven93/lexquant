@@ -8,7 +8,6 @@ import {
   Search,
   CalendarDays,
   Settings,
-  Scale,
   PlusCircle,
   LogOut,
 } from "lucide-react";
@@ -33,16 +32,22 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="w-64 bg-slate-900 text-white flex flex-col border-r border-slate-800">
-      <div className="p-6 border-b border-slate-800">
-        <Link href="/dashboard" className="flex items-center gap-3">
-          <Scale className="w-8 h-8 text-indigo-400" />
-          <span className="text-xl font-bold">Mercury</span>
+    <aside className="w-52 flex flex-col border-r" style={{ background: 'var(--bb-bg)', borderColor: 'var(--bb-border)' }}>
+      <div className="px-4 py-4 border-b" style={{ borderColor: 'var(--bb-border)' }}>
+        <Link href="/dashboard" className="flex items-center gap-2">
+          <span className="text-base font-bold tracking-widest" style={{ color: 'var(--bb-amber)' }}>
+            LEXQUANT
+          </span>
         </Link>
-        <p className="text-xs text-slate-500 mt-1">Court Case Tracker</p>
+        <div className="flex items-center gap-1.5 mt-1">
+          <span className="live-dot" />
+          <p className="text-muted" style={{ fontSize: '0.58rem', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+            Court Terminal
+          </p>
+        </div>
       </div>
 
-      <nav className="flex-1 p-4 space-y-1">
+      <nav className="flex-1 px-2 py-3 space-y-0.5">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive =
@@ -53,25 +58,33 @@ export function Sidebar() {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors",
+                "flex items-center gap-2.5 px-3 py-2 text-xs font-semibold tracking-wide uppercase transition-colors",
                 isActive
-                  ? "bg-indigo-600 text-white"
-                  : "text-slate-400 hover:bg-slate-800 hover:text-white"
+                  ? "border-l-2"
+                  : "border-l-2 border-transparent hover:opacity-80"
               )}
+              style={{
+                color: isActive ? 'var(--bb-amber)' : 'var(--bb-gray)',
+                borderLeftColor: isActive ? 'var(--bb-amber)' : 'transparent',
+                letterSpacing: '0.06em',
+              }}
             >
-              <Icon className="w-5 h-5" />
+              <Icon className="w-4 h-4" />
               {item.label}
             </Link>
           );
         })}
       </nav>
 
-      <div className="p-4 border-t border-slate-800">
+      <div className="px-2 py-3 border-t" style={{ borderColor: 'var(--bb-border)' }}>
         <button
           onClick={handleLogout}
-          className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-800 hover:text-white transition-colors w-full"
+          className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold tracking-wide uppercase transition-colors w-full hover:opacity-80"
+          style={{ color: 'var(--bb-gray)', letterSpacing: '0.06em' }}
+          onMouseEnter={(e) => e.currentTarget.style.color = 'var(--bb-red)'}
+          onMouseLeave={(e) => e.currentTarget.style.color = 'var(--bb-gray)'}
         >
-          <LogOut className="w-5 h-5" />
+          <LogOut className="w-4 h-4" />
           Sign Out
         </button>
       </div>

@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { DashboardShell } from "@/components/DashboardShell";
-import { Bell, Mail, MessageCircle, Save, Check } from "lucide-react";
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
@@ -49,8 +48,8 @@ export default function SettingsPage() {
   if (loading) {
     return (
       <DashboardShell>
-        <div className="flex items-center justify-center h-full">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
+          <span style={{ color: "var(--bb-amber)", fontSize: "0.75rem", letterSpacing: "0.1em", fontWeight: 600 }}>[LOADING CONFIG...]</span>
         </div>
       </DashboardShell>
     );
@@ -58,160 +57,159 @@ export default function SettingsPage() {
 
   return (
     <DashboardShell>
-      <div className="p-6 max-w-2xl space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Configure your notification preferences
-          </p>
+      <div style={{ maxWidth: "640px", padding: "1rem", display: "flex", flexDirection: "column", gap: "1px", background: "var(--bb-border)" }}>
+        {/* Header */}
+        <div className="bb-panel-header">
+          <span className="bb-panel-title">TERMINAL SETTINGS</span>
         </div>
 
         {/* Email Alerts */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-50 rounded-lg">
-                <Mail className="w-5 h-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-900">
-                  Email Alerts
-                </p>
-                <p className="text-xs text-gray-500">
-                  Receive case updates via email
-                </p>
-              </div>
+        <div className="bb-panel">
+          <div className="bb-panel-header">
+            <span className="bb-panel-title" style={{ fontSize: "0.6rem" }}>EMAIL ALERTS</span>
+          </div>
+          <div className="bb-panel-body" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.6rem 0.75rem" }}>
+            <div>
+              <p style={{ fontSize: "0.78rem", color: "var(--bb-white)" }}>Receive case updates via email</p>
             </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={prefs.email_alerts}
-                onChange={(e) =>
-                  setPrefs({ ...prefs, email_alerts: e.target.checked })
-                }
-                className="sr-only peer"
+            <div
+              onClick={() => setPrefs({ ...prefs, email_alerts: !prefs.email_alerts })}
+              style={{
+                width: "36px",
+                height: "18px",
+                borderRadius: "9px",
+                background: prefs.email_alerts ? "var(--bb-amber)" : "var(--bb-gray-dim)",
+                cursor: "pointer",
+                position: "relative",
+                transition: "background 0.15s",
+                flexShrink: 0,
+              }}
+            >
+              <div
+                style={{
+                  width: "14px",
+                  height: "14px",
+                  borderRadius: "50%",
+                  background: prefs.email_alerts ? "var(--bb-bg)" : "var(--bb-gray)",
+                  position: "absolute",
+                  top: "2px",
+                  left: prefs.email_alerts ? "20px" : "2px",
+                  transition: "left 0.15s",
+                }}
               />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
-            </label>
+            </div>
           </div>
         </div>
 
         {/* Telegram Alerts */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-50 rounded-lg">
-                <MessageCircle className="w-5 h-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-900">
-                  Telegram Alerts
-                </p>
-                <p className="text-xs text-gray-500">
-                  Receive instant updates via Telegram
-                </p>
-              </div>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={prefs.telegram_alerts}
-                onChange={(e) =>
-                  setPrefs({ ...prefs, telegram_alerts: e.target.checked })
-                }
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
-            </label>
+        <div className="bb-panel">
+          <div className="bb-panel-header">
+            <span className="bb-panel-title" style={{ fontSize: "0.6rem" }}>TELEGRAM ALERTS</span>
           </div>
-
-          {prefs.telegram_alerts && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Telegram Chat ID
-              </label>
-              <input
-                type="text"
-                value={prefs.telegram_chat_id}
-                onChange={(e) =>
-                  setPrefs({ ...prefs, telegram_chat_id: e.target.value })
-                }
-                placeholder="e.g., 123456789"
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-gray-900 bg-white placeholder:text-gray-400"
-              />
-              <div className="mt-2 p-3 bg-gray-50 rounded-lg">
-                <p className="text-xs text-gray-600 font-medium mb-1">
-                  How to get your Chat ID:
-                </p>
-                <ol className="text-xs text-gray-500 space-y-1 list-decimal list-inside">
-                  <li>Open Telegram and search for @BotFather</li>
-                  <li>Send /newbot and follow the steps to create a bot</li>
-                  <li>Copy the bot token and add it to your environment variables</li>
-                  <li>Send any message to your new bot</li>
-                  <li>
-                    Visit{" "}
-                    <code className="bg-gray-200 px-1 rounded">
-                      https://api.telegram.org/bot&lt;TOKEN&gt;/getUpdates
-                    </code>
-                  </li>
-                  <li>Find your chat_id in the response</li>
-                </ol>
+          <div className="bb-panel-body" style={{ padding: "0.6rem 0.75rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: prefs.telegram_alerts ? "0.75rem" : 0 }}>
+              <p style={{ fontSize: "0.78rem", color: "var(--bb-white)" }}>Receive instant updates via Telegram</p>
+              <div
+                onClick={() => setPrefs({ ...prefs, telegram_alerts: !prefs.telegram_alerts })}
+                style={{
+                  width: "36px",
+                  height: "18px",
+                  borderRadius: "9px",
+                  background: prefs.telegram_alerts ? "var(--bb-amber)" : "var(--bb-gray-dim)",
+                  cursor: "pointer",
+                  position: "relative",
+                  transition: "background 0.15s",
+                  flexShrink: 0,
+                }}
+              >
+                <div
+                  style={{
+                    width: "14px",
+                    height: "14px",
+                    borderRadius: "50%",
+                    background: prefs.telegram_alerts ? "var(--bb-bg)" : "var(--bb-gray)",
+                    position: "absolute",
+                    top: "2px",
+                    left: prefs.telegram_alerts ? "20px" : "2px",
+                    transition: "left 0.15s",
+                  }}
+                />
               </div>
             </div>
-          )}
+
+            {prefs.telegram_alerts && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.6rem", color: "var(--bb-gray)", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600, marginBottom: "0.3rem" }}>
+                    TELEGRAM CHAT ID
+                  </label>
+                  <input
+                    type="text"
+                    value={prefs.telegram_chat_id}
+                    onChange={(e) =>
+                      setPrefs({ ...prefs, telegram_chat_id: e.target.value })
+                    }
+                    placeholder="e.g., 123456789"
+                    style={{ width: "100%", boxSizing: "border-box" }}
+                  />
+                </div>
+                <div style={{ padding: "0.5rem", background: "var(--bb-bg)", border: "1px solid var(--bb-border)", fontFamily: "var(--bb-font)" }}>
+                  <p style={{ fontSize: "0.6rem", color: "var(--bb-amber)", fontWeight: 600, marginBottom: "0.4rem" }}>
+                    HOW TO GET YOUR CHAT ID:
+                  </p>
+                  <div style={{ fontSize: "0.6rem", color: "var(--bb-gray)", lineHeight: "1.6" }}>
+                    <div>1. Open Telegram and search for @BotFather</div>
+                    <div>2. Send /newbot and follow the steps</div>
+                    <div>3. Copy the bot token to your env vars</div>
+                    <div>4. Send any message to your new bot</div>
+                    <div>5. Visit <code style={{ color: "var(--bb-amber-dim)", fontSize: "0.58rem" }}>https://api.telegram.org/bot&lt;TOKEN&gt;/getUpdates</code></div>
+                    <div>6. Find your chat_id in the response</div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Alert Timing */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-yellow-50 rounded-lg">
-              <Bell className="w-5 h-5 text-yellow-600" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-900">
-                Hearing Reminders
-              </p>
-              <p className="text-xs text-gray-500">
-                Get notified before upcoming hearings
-              </p>
-            </div>
+        {/* Hearing Reminders */}
+        <div className="bb-panel">
+          <div className="bb-panel-header">
+            <span className="bb-panel-title" style={{ fontSize: "0.6rem" }}>HEARING REMINDERS</span>
           </div>
-          <select
-            value={prefs.alert_before_hearing_hours}
-            onChange={(e) =>
-              setPrefs({
-                ...prefs,
-                alert_before_hearing_hours: Number(e.target.value),
-              })
-            }
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-gray-900 bg-white appearance-auto"
-          >
-            <option value={1}>1 hour before</option>
-            <option value={6}>6 hours before</option>
-            <option value={12}>12 hours before</option>
-            <option value={24}>24 hours before (1 day)</option>
-            <option value={48}>48 hours before (2 days)</option>
-          </select>
+          <div className="bb-panel-body" style={{ padding: "0.6rem 0.75rem" }}>
+            <label style={{ display: "block", fontSize: "0.6rem", color: "var(--bb-gray)", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600, marginBottom: "0.3rem" }}>
+              ALERT BEFORE HEARING
+            </label>
+            <select
+              value={prefs.alert_before_hearing_hours}
+              onChange={(e) =>
+                setPrefs({
+                  ...prefs,
+                  alert_before_hearing_hours: Number(e.target.value),
+                })
+              }
+              style={{ width: "100%", boxSizing: "border-box" }}
+            >
+              <option value={1}>1 hour before</option>
+              <option value={6}>6 hours before</option>
+              <option value={12}>12 hours before</option>
+              <option value={24}>24 hours before (1 day)</option>
+              <option value={48}>48 hours before (2 days)</option>
+            </select>
+          </div>
         </div>
 
         {/* Save button */}
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-400 text-white font-medium rounded-lg transition-colors"
-        >
-          {saved ? (
-            <>
-              <Check className="w-5 h-5" />
-              Saved!
-            </>
-          ) : (
-            <>
-              <Save className="w-5 h-5" />
-              {saving ? "Saving..." : "Save Settings"}
-            </>
-          )}
-        </button>
+        <div style={{ background: "var(--bb-panel)", padding: "0.75rem" }}>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="bb-btn bb-btn-primary"
+            style={{ opacity: saving ? 0.6 : 1, cursor: saving ? "not-allowed" : "pointer" }}
+          >
+            {saved ? "[SAVED]" : saving ? "[SAVING...]" : "[SAVE CONFIG]"}
+          </button>
+        </div>
       </div>
     </DashboardShell>
   );

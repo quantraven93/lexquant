@@ -2,9 +2,8 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { format } from "date-fns";
+import { format, differenceInDays } from "date-fns";
 import { cn, COURT_TYPE_COLORS, STATUS_COLORS } from "@/lib/utils";
-import { Search, ChevronRight } from "lucide-react";
 
 interface CaseRow {
   id: string;
@@ -50,131 +49,136 @@ export function CaseTable({ cases }: { cases: CaseRow[] }) {
     { key: "CF", label: "Consumer" },
   ];
 
+  function getHearingStyle(dateStr: string | null) {
+    if (!dateStr) return {};
+    const days = differenceInDays(new Date(dateStr), new Date());
+    if (days < 0) return { color: 'var(--bb-red)' };
+    if (days <= 7) return { color: 'var(--bb-amber)' };
+    return { color: 'var(--bb-white)' };
+  }
+
   return (
-    <div className="bg-white rounded-xl border border-gray-200">
-      <div className="p-4 border-b border-gray-200">
-        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-          <div className="flex gap-1">
-            {courtTabs.map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => setFilter(tab.key)}
-                className={cn(
-                  "px-3 py-1.5 text-sm font-medium rounded-lg transition-colors",
-                  filter === tab.key
-                    ? "bg-indigo-100 text-indigo-700"
-                    : "text-gray-500 hover:bg-gray-100"
-                )}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search cases..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 pr-4 py-2 text-sm text-gray-900 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-gray-400"
-            />
-          </div>
+    <div className="bb-panel">
+      <div className="bb-panel-header">
+        <span className="bb-panel-title">Case Monitor</span>
+        <span className="text-muted" style={{ fontSize: '0.6rem' }}>
+          {filtered.length} CASES
+        </span>
+      </div>
+
+      <div className="flex items-center justify-between" style={{ background: 'var(--bb-panel-header)', borderBottom: '1px solid var(--bb-border)' }}>
+        <div className="bb-tabs" style={{ borderBottom: 'none', flex: 1 }}>
+          {courtTabs.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setFilter(tab.key)}
+              className={cn("bb-tab", filter === tab.key && "active")}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        <div className="px-3">
+          <input
+            type="text"
+            placeholder="SEARCH..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{
+              fontSize: '0.65rem',
+              padding: '0.25rem 0.5rem',
+              width: '140px',
+              letterSpacing: '0.05em',
+              textTransform: 'uppercase',
+            }}
+          />
         </div>
       </div>
 
       {filtered.length === 0 ? (
-        <div className="p-12 text-center text-gray-500">
-          <p className="text-lg font-medium">No cases found</p>
-          <p className="text-sm mt-1">
-            {cases.length === 0
-              ? "Add your first case to get started"
-              : "Try adjusting your filters"}
+        <div className="p-8 text-center" style={{ color: 'var(--bb-gray)' }}>
+          <p style={{ fontSize: '0.8rem', letterSpacing: '0.05em' }}>
+            {cases.length === 0 ? "NO CASES TRACKED" : "NO RESULTS"}
           </p>
         </div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="bb-table">
             <thead>
-              <tr className="border-b border-gray-100">
-                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">
-                  Case
-                </th>
-                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">
-                  Court
-                </th>
-                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">
-                  Status
-                </th>
-                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">
-                  Next Hearing
-                </th>
-                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">
-                  Tags
-                </th>
-                <th className="px-6 py-3"></th>
+              <tr>
+                <th>Case</th>
+                <th>Court</th>
+                <th>Status</th>
+                <th>Next Hearing</th>
+                <th>Tags</th>
+                <th style={{ width: '30px' }}></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody>
               {filtered.map((c) => (
-                <tr
-                  key={c.id}
-                  className="hover:bg-gray-50 transition-colors"
-                >
-                  <td className="px-6 py-4">
-                    <div className="max-w-xs">
-                      <p className="text-sm font-medium text-gray-900 truncate">
+                <tr key={c.id}>
+                  <td>
+                    <div style={{ maxWidth: '280px' }}>
+                      <p style={{ fontSize: '0.78rem', fontWeight: 500, color: 'var(--bb-white)' }} className="truncate">
                         {c.case_title || `${c.case_number}/${c.case_year}`}
                       </p>
-                      <p className="text-xs text-gray-500 mt-0.5">
+                      <p style={{ fontSize: '0.62rem', color: 'var(--bb-gray)', marginTop: '1px' }}>
                         {c.case_number}{c.case_year ? `/${c.case_year}` : ""}
                       </p>
                     </div>
                   </td>
-                  <td className="px-6 py-4">
+                  <td>
                     <span
                       className={cn(
-                        "inline-flex px-2 py-0.5 text-xs font-medium rounded-full",
-                        COURT_TYPE_COLORS[c.court_type] || "bg-gray-100 text-gray-800"
+                        "inline-flex px-1.5 py-0.5 text-xs font-semibold",
+                        COURT_TYPE_COLORS[c.court_type] || "bg-gray-800/50 text-gray-500"
                       )}
+                      style={{ fontSize: '0.6rem', letterSpacing: '0.04em' }}
                     >
                       {c.court_type}
                     </span>
                   </td>
-                  <td className="px-6 py-4">
+                  <td>
                     <span
                       className={cn(
-                        "inline-flex px-2 py-0.5 text-xs font-medium rounded-full",
+                        "inline-flex px-1.5 py-0.5 text-xs font-semibold",
                         STATUS_COLORS[c.current_status || "Unknown"] ||
-                          "bg-gray-100 text-gray-800"
+                          "bg-gray-800/50 text-gray-500"
                       )}
+                      style={{ fontSize: '0.6rem', letterSpacing: '0.04em' }}
                     >
                       {c.current_status || "Unknown"}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">
+                  <td style={{ ...getHearingStyle(c.next_hearing_date), fontSize: '0.75rem' }}>
                     {c.next_hearing_date
                       ? format(new Date(c.next_hearing_date), "dd MMM yyyy")
                       : "-"}
                   </td>
-                  <td className="px-6 py-4">
+                  <td>
                     <div className="flex gap-1 flex-wrap">
                       {(c.tags || []).slice(0, 3).map((tag) => (
                         <span
                           key={tag}
-                          className="inline-flex px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded"
+                          style={{
+                            fontSize: '0.55rem',
+                            padding: '0.1rem 0.3rem',
+                            border: '1px solid var(--bb-border)',
+                            color: 'var(--bb-gray)',
+                            letterSpacing: '0.03em',
+                          }}
                         >
                           {tag}
                         </span>
                       ))}
                     </div>
                   </td>
-                  <td className="px-6 py-4">
+                  <td>
                     <Link
                       href={`/case/${c.id}`}
-                      className="text-indigo-600 hover:text-indigo-800"
+                      style={{ color: 'var(--bb-amber)', fontSize: '0.8rem', fontWeight: 700 }}
                     >
-                      <ChevronRight className="w-5 h-5" />
+                      &gt;
                     </Link>
                   </td>
                 </tr>

@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Legal Case Manager{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Dashboard</h1>
+    <p class="page-subtitle">Overview of your legal practice</p>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-icon">📁</div>
+        <div class="stat-label">Total Cases</div>
+        <div class="stat-value" id="total-cases">0</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon">⚡</div>
+        <div class="stat-label">Active Cases</div>
+        <div class="stat-value" id="active-cases">0</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon">📅</div>
+        <div class="stat-label">Upcoming Hearings (7 days)</div>
+        <div class="stat-value" id="upcoming-hearings">0</div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Upcoming Hearings</h2>
+        <a href="/hearings" class="btn btn-primary btn-small">View All</a>
+    </div>
+    <div id="hearings-list">
+        <div class="loading">
+            <div class="spinner"></div>
+            Loading hearings...
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Recent Cases</h2>
+        <a href="/cases" class="btn btn-primary btn-small">View All</a>
+    </div>
+    <div id="cases-list">
+        <div class="loading">
+            <div class="spinner"></div>
+            Loading cases...
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Load dashboard data
+    async function loadDashboard() {
+        try {
+            // Load statistics
+            const statsResponse = await fetch('/api/dashboard/stats');
+            const stats = await statsResponse.json();
+            
+            document.getElementById('total-cases').textContent = stats.total_cases;
+            document.getElementById('active-cases').textContent = stats.active_cases;
+            document.getElementById('upcoming-hearings').textContent = stats.upcoming_hearings;
+
+            // Load upcoming hearings
+            const hearingsResponse = await fetch('/api/upcoming-hearings?days=7');
+            const hearings = await hearingsResponse.json();
+            renderHearings(hearings);
+
+            // Load recent cases
+            const casesResponse = await fetch('/api/cases');
+            const cases = await casesResponse.json();
+            renderRecentCases(cases.slice(0, 5));
+
+        } catch (error) {
+            console.error('Error loading dashboard:', error);
+            showNotification('Failed to load dashboard data', 'error');
+        }
+    }
+
+    function renderHearings(hearings) {
+        const container = document.getElementById('hearings-list');
+        
+        if (hearings.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">📅</div>
+                    <div class="empty-state-text">No upcoming hearings</div>
+                    <p style="color: var(--text-secondary);">Schedule your first hearing from the Cases page</p>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = hearings.map(hearing => {
+            const daysLeft = daysUntil(hearing.hearing_date);
+            const urgencyClass = daysLeft <= 2 ? 'danger' : daysLeft <= 7 ? 'warning' : 'info';
+            const urgencyText = daysLeft === 0 ? 'Today' : 
+                               daysLeft === 1 ? 'Tomorrow' : 
+                               `${daysLeft} days`;
+
+            return `
+                <div class="hearing-item">
+                    <div style="display: flex; justify-content: space-between; align-items: start;">
+                        <div style="flex: 1;">
+                            <div class="hearing-date">
+                                ${formatDate(hearing.hearing_date)} ${hearing.hearing_time ? 'at ' + hearing.hearing_time : ''}
+                            </div>
+                            <div class="hearing-case">${hearing.case_number}: ${hearing.case_title}</div>
+                            <div class="hearing-details">
+                                ${hearing.court_name} • ${hearing.hearing_type}
+                                ${hearing.purpose ? ' • ' + hearing.purpose : ''}
+                            </div>
+                        </div>
+                        <span class="badge badge-${urgencyClass}">${urgencyText}</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function renderRecentCases(cases) {
+        const container = document.getElementById('cases-list');
+        
+        if (cases.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">📂</div>
+                    <div class="empty-state-text">No cases yet</div>
+                    <p style="color: var(--text-secondary);">Add your first case to get started</p>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = `
+            <div class="table-container">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Case Number</th>
+                            <th>Case Title</th>
+                            <th>Client</th>
+                            <th>Court</th>
+                            <th>Status</th>
+                            <th>Priority</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${cases.map(c => `
+                            <tr onclick="window.location.href='/cases'" style="cursor: pointer;">
+                                <td><strong>${c.case_number}</strong></td>
+                                <td>${c.case_title}</td>
+                                <td>${c.client_name}</td>
+                                <td>${c.court_name}</td>
+                                <td><span class="badge badge-${c.status === 'Active' ? 'success' : c.status === 'Closed' ? 'secondary' : 'info'}">${c.status}</span></td>
+                                <td><span class="badge priority-${c.case_priority.toLowerCase()}">${c.case_priority}</span></td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    // Load dashboard on page load
+    document.addEventListener('DOMContentLoaded', loadDashboard);
+</script>
+{% endblock %}

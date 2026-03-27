@@ -14,8 +14,6 @@ import {
   startOfWeek,
   endOfWeek,
 } from "date-fns";
-import { cn, COURT_TYPE_COLORS } from "@/lib/utils";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 
 interface HearingEvent {
@@ -57,49 +55,45 @@ export default function CalendarPage() {
     );
   }
 
-  const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const weekDays = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 
   return (
     <DashboardShell>
-      <div className="p-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Calendar</h1>
-            <p className="text-sm text-gray-500 mt-1">
-              View upcoming hearings
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
+      <div style={{ display: "flex", flexDirection: "column", gap: "1px", background: "var(--bb-border)", minHeight: "100%" }}>
+        {/* Header */}
+        <div className="bb-panel-header">
+          <span className="bb-panel-title">HEARING SCHEDULE</span>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
             <button
               onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-              className="p-2 hover:bg-gray-100 rounded-lg"
+              style={{ background: "none", border: "none", color: "var(--bb-amber)", cursor: "pointer", fontSize: "0.75rem", fontFamily: "var(--bb-font)", fontWeight: 700 }}
             >
-              <ChevronLeft className="w-5 h-5" />
+              &lt;
             </button>
-            <span className="text-lg font-semibold text-gray-900 min-w-[180px] text-center">
+            <span style={{ fontSize: "0.68rem", color: "var(--bb-white)", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", minWidth: "120px", textAlign: "center" }}>
               {format(currentMonth, "MMMM yyyy")}
             </span>
             <button
               onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-              className="p-2 hover:bg-gray-100 rounded-lg"
+              style={{ background: "none", border: "none", color: "var(--bb-amber)", cursor: "pointer", fontSize: "0.75rem", fontFamily: "var(--bb-font)", fontWeight: 700 }}
             >
-              <ChevronRight className="w-5 h-5" />
+              &gt;
             </button>
           </div>
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "16rem", background: "var(--bb-panel)" }}>
+            <span style={{ color: "var(--bb-amber)", fontSize: "0.75rem", letterSpacing: "0.1em", fontWeight: 600 }}>[LOADING DATA...]</span>
           </div>
         ) : (
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="bb-panel" style={{ overflow: "hidden" }}>
             {/* Week day headers */}
-            <div className="grid grid-cols-7 border-b border-gray-200">
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", borderBottom: "1px solid var(--bb-border)" }}>
               {weekDays.map((day) => (
                 <div
                   key={day}
-                  className="py-3 text-center text-xs font-medium text-gray-500 uppercase"
+                  style={{ padding: "0.4rem", textAlign: "center", fontSize: "0.6rem", color: "var(--bb-gray)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600 }}
                 >
                   {day}
                 </div>
@@ -107,7 +101,7 @@ export default function CalendarPage() {
             </div>
 
             {/* Calendar grid */}
-            <div className="grid grid-cols-7">
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}>
               {days.map((day, i) => {
                 const dayCases = getCasesForDay(day);
                 const isToday = isSameDay(day, new Date());
@@ -116,32 +110,44 @@ export default function CalendarPage() {
                 return (
                   <div
                     key={i}
-                    className={cn(
-                      "min-h-[100px] p-2 border-b border-r border-gray-100",
-                      !isCurrentMonth && "bg-gray-50"
-                    )}
+                    style={{
+                      minHeight: "90px",
+                      padding: "0.3rem",
+                      borderBottom: "1px solid var(--bb-border)",
+                      borderRight: "1px solid var(--bb-border)",
+                      background: !isCurrentMonth ? "rgba(10,14,23,0.5)" : "transparent",
+                    }}
                   >
                     <p
-                      className={cn(
-                        "text-sm font-medium mb-1",
-                        isToday
-                          ? "bg-indigo-600 text-white w-7 h-7 rounded-full flex items-center justify-center"
+                      style={{
+                        fontSize: "0.78rem",
+                        fontWeight: isToday ? 700 : 500,
+                        marginBottom: "0.2rem",
+                        color: isToday
+                          ? "var(--bb-amber)"
                           : isCurrentMonth
-                          ? "text-gray-900"
-                          : "text-gray-300"
-                      )}
+                          ? "var(--bb-white)"
+                          : "var(--bb-gray-dim)",
+                        textDecoration: isToday ? "underline" : "none",
+                        textUnderlineOffset: "2px",
+                      }}
                     >
                       {format(day, "d")}
                     </p>
-                    <div className="space-y-1">
+                    <div style={{ display: "flex", flexDirection: "column", gap: "1px" }}>
                       {dayCases.slice(0, 3).map((c) => (
                         <Link
                           key={c.id}
                           href={`/case/${c.id}`}
-                          className={cn(
-                            "block px-1.5 py-0.5 text-xs rounded truncate",
-                            COURT_TYPE_COLORS[c.court_type] || "bg-gray-100"
-                          )}
+                          style={{
+                            display: "block",
+                            fontSize: "0.6rem",
+                            color: "var(--bb-amber)",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                            textDecoration: "none",
+                          }}
                           title={c.case_title || c.case_number}
                         >
                           {c.case_title
@@ -150,7 +156,7 @@ export default function CalendarPage() {
                         </Link>
                       ))}
                       {dayCases.length > 3 && (
-                        <p className="text-xs text-gray-400 px-1.5">
+                        <p style={{ fontSize: "0.55rem", color: "var(--bb-gray)" }}>
                           +{dayCases.length - 3} more
                         </p>
                       )}

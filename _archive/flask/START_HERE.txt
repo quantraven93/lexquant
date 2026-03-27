@@ -1,0 +1,140 @@
+═══════════════════════════════════════════════════════════════
+    LEGAL CASE MANAGER - Professional Case Tracking Software
+═══════════════════════════════════════════════════════════════
+
+                    ⚖️  Welcome, Advocate!  ⚖️
+
+         Your Complete Case Management Solution is Ready!
+
+═══════════════════════════════════════════════════════════════
+
+
+🚀 FIRST TIME USERS - START HERE:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Step 1: Read "QUICK_START.md" (5 minutes)
+        👉 This tells you exactly how to install and run
+
+Step 2: Run Installation
+        Windows Users: Double-click "install.bat"
+        Mac/Linux Users: Run "./install.sh" in terminal
+
+Step 3: Start the Application
+        Open terminal/command prompt in this folder
+        Type: python app.py
+        Press Enter
+
+Step 4: Open Your Browser
+        Go to: http://127.0.0.1:5000
+        
+Step 5: Start Managing Cases!
+        Add your first case and hearing
+
+
+📚 IMPORTANT DOCUMENTS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+READ IN THIS ORDER:
+
+1. QUICK_START.md
+   → Installation & basic usage (MUST READ!)
+
+2. PACKAGE_INFO.md
+   → What's included & system requirements
+
+3. FEATURES.md
+   → Complete list of all features
+
+4. README.md
+   → Detailed manual & troubleshooting
+
+
+⚠️  CRITICAL: BACKUP YOUR DATA!
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Your database file: legal_case_manager.db
+
+This file contains ALL your cases and hearings!
+Back it up regularly to Google Drive, USB, or cloud storage.
+
+To backup: Simply copy the .db file to a safe location
+To restore: Replace the .db file with your backup
+
+
+✅ WHAT YOU GET:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✓ Complete case management system
+✓ Hearing calendar and tracking
+✓ Dashboard with statistics
+✓ Search and filter capabilities
+✓ Professional interface
+✓ 100% private (runs on YOUR computer)
+✓ No internet required
+✓ Unlimited cases and hearings
+✓ Free forever - no subscriptions
+
+
+🔐 YOUR DATA IS PRIVATE:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✓ Stored only on your computer
+✓ No cloud uploads
+✓ No external servers
+✓ No tracking or analytics
+✓ Complete privacy and security
+
+
+💡 QUICK TIPS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+• Keep terminal window open while using the app
+• Bookmark http://127.0.0.1:5000 in your browser
+• Press CTRL+C in terminal to stop the application
+• Use meaningful case numbers for easy tracking
+• Set priority levels for urgent cases
+• Add notes to cases for detailed documentation
+
+
+🆘 NEED HELP?
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Problem: Can't install
+Solution: Check README.md → "Troubleshooting" section
+
+Problem: Application won't start
+Solution: Ensure Python 3.7+ is installed
+         Check: python --version
+
+Problem: Can't access in browser
+Solution: Make sure application is running
+         Check terminal for error messages
+
+
+📋 SYSTEM REQUIREMENTS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+• Python 3.7 or higher (REQUIRED)
+• Modern web browser (Chrome, Firefox, Safari, Edge)
+• 50MB free disk space
+• Windows 7+, macOS 10.12+, or Linux
+
+
+🎯 READY TO START?
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Open "QUICK_START.md" now
+2. Follow the 5-minute installation guide
+3. Start managing your cases professionally!
+
+
+═══════════════════════════════════════════════════════════════
+
+            Built for Indian Legal Practice
+       Professional • Private • Powerful • Free
+
+═══════════════════════════════════════════════════════════════
+
+                  Happy Case Management! ⚖️
+
+═══════════════════════════════════════════════════════════════

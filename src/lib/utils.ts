@@ -14,18 +14,18 @@ export const COURT_TYPES = [
 ] as const;
 
 export const COURT_TYPE_COLORS: Record<string, string> = {
-  SC: "bg-red-100 text-red-800",
-  HC: "bg-blue-100 text-blue-800",
-  DC: "bg-green-100 text-green-800",
-  NCLT: "bg-purple-100 text-purple-800",
-  CF: "bg-orange-100 text-orange-800",
+  SC: "bg-red-900/30 text-red-400 border border-red-800/50",
+  HC: "bg-amber-900/30 text-amber-400 border border-amber-800/50",
+  DC: "bg-green-900/30 text-green-400 border border-green-800/50",
+  NCLT: "bg-purple-900/30 text-purple-400 border border-purple-800/50",
+  CF: "bg-blue-900/30 text-blue-400 border border-blue-800/50",
 };
 
 export const STATUS_COLORS: Record<string, string> = {
-  Pending: "bg-yellow-100 text-yellow-800",
-  Disposed: "bg-green-100 text-green-800",
-  Transferred: "bg-blue-100 text-blue-800",
-  Unknown: "bg-gray-100 text-gray-800",
+  Pending: "bg-amber-900/30 text-amber-400 border border-amber-800/50",
+  Disposed: "bg-green-900/30 text-green-400 border border-green-800/50",
+  Transferred: "bg-blue-900/30 text-blue-400 border border-blue-800/50",
+  Unknown: "bg-gray-800/50 text-gray-500 border border-gray-700/50",
 };
 
 export const INDIAN_STATES = [

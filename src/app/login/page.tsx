@@ -3,7 +3,6 @@
 import { createClient } from "@/lib/supabase/client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Scale } from "lucide-react";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -41,90 +40,99 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-3 mb-2">
-            <Scale className="w-10 h-10 text-indigo-400" />
-            <h1 className="text-4xl font-bold text-white">Mercury</h1>
-          </div>
-          <p className="text-slate-400">
-            Indian Court Case Tracker
+    <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bb-bg)' }}>
+      <div className="w-full max-w-sm">
+        {/* Logo */}
+        <div className="text-center mb-6">
+          <h1 className="text-xl font-bold tracking-widest" style={{ color: 'var(--bb-amber)' }}>
+            LEXQUANT
+          </h1>
+          <p style={{ color: 'var(--bb-gray)', fontSize: '0.6rem', letterSpacing: '0.1em', textTransform: 'uppercase', marginTop: '0.25rem' }}>
+            Court Terminal Access
           </p>
         </div>
 
-        <div className="bg-white/5 backdrop-blur-lg border border-white/10 rounded-2xl p-8">
-          <h2 className="text-xl font-semibold text-white mb-6">
-            {isSignUp ? "Create Account" : "Sign In"}
-          </h2>
+        {/* Login Panel */}
+        <div className="bb-panel">
+          <div className="bb-panel-header">
+            <span className="bb-panel-title">
+              {isSignUp ? "Create Account" : "Authenticate"}
+            </span>
+            <span className="live-dot" />
+          </div>
 
-          <form onSubmit={handleAuth} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">
-                Email
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                placeholder="you@example.com"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">
-                Password
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                placeholder="Min 6 characters"
-              />
-            </div>
-
-            {message && (
-              <div
-                className={`text-sm p-3 rounded-lg ${
-                  message.includes("Check your email")
-                    ? "bg-green-500/10 text-green-400 border border-green-500/20"
-                    : "bg-red-500/10 text-red-400 border border-red-500/20"
-                }`}
-              >
-                {message}
+          <div className="bb-panel-body" style={{ padding: '1.25rem' }}>
+            <form onSubmit={handleAuth} className="space-y-4">
+              <div>
+                <label style={{ display: 'block', fontSize: '0.6rem', fontWeight: 600, color: 'var(--bb-gray)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.3rem' }}>
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  placeholder="you@example.com"
+                  style={{ width: '100%' }}
+                />
               </div>
-            )}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-800 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
-            >
-              {loading
-                ? "Please wait..."
-                : isSignUp
-                ? "Create Account"
-                : "Sign In"}
-            </button>
-          </form>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.6rem', fontWeight: 600, color: 'var(--bb-gray)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.3rem' }}>
+                  Password
+                </label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={6}
+                  placeholder="Min 6 characters"
+                  style={{ width: '100%' }}
+                />
+              </div>
 
-          <div className="mt-6 text-center">
-            <button
-              onClick={() => {
-                setIsSignUp(!isSignUp);
-                setMessage("");
-              }}
-              className="text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
-            >
-              {isSignUp
-                ? "Already have an account? Sign in"
-                : "Don't have an account? Sign up"}
-            </button>
+              {message && (
+                <div
+                  style={{
+                    fontSize: '0.75rem',
+                    padding: '0.5rem 0.75rem',
+                    border: `1px solid ${message.includes("Check your email") ? 'var(--bb-green)' : 'var(--bb-red)'}`,
+                    color: message.includes("Check your email") ? 'var(--bb-green)' : 'var(--bb-red)',
+                    background: message.includes("Check your email") ? 'rgba(0,210,106,0.05)' : 'rgba(255,59,59,0.05)',
+                  }}
+                >
+                  {message}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="bb-btn bb-btn-primary"
+                style={{ width: '100%', opacity: loading ? 0.6 : 1 }}
+              >
+                {loading
+                  ? "PLEASE WAIT..."
+                  : isSignUp
+                  ? "CREATE ACCOUNT"
+                  : "AUTHENTICATE"}
+              </button>
+            </form>
+
+            <div className="text-center mt-4">
+              <button
+                onClick={() => {
+                  setIsSignUp(!isSignUp);
+                  setMessage("");
+                }}
+                style={{ fontSize: '0.7rem', color: 'var(--bb-amber)', background: 'none', border: 'none', cursor: 'pointer' }}
+              >
+                {isSignUp
+                  ? "EXISTING USER? [SIGN IN]"
+                  : "NEW USER? [CREATE ACCOUNT]"}
+              </button>
+            </div>
           </div>
         </div>
       </div>

@@ -1,153 +1,142 @@
 import Link from "next/link";
-import {
-  Scale,
-  Bell,
-  Calendar,
-  Search,
-  Zap,
-  Shield,
-} from "lucide-react";
+
+const features = [
+  {
+    tag: "ALT",
+    title: "Instant Alerts",
+    desc: "Telegram + Email notifications within minutes of status changes, new orders, or hearing updates.",
+  },
+  {
+    tag: "CAL",
+    title: "Hearing Calendar",
+    desc: "Visual calendar of all upcoming hearings. Generate daily cause lists across court complexes.",
+  },
+  {
+    tag: "SCH",
+    title: "Court Search",
+    desc: "Search across all Indian courts by party name. Find and track any case instantly.",
+  },
+  {
+    tag: "UPD",
+    title: "Auto-Updates",
+    desc: "Cases checked every 30 minutes. CAPTCHA solved automatically via GPT-4o Vision.",
+  },
+  {
+    tag: "COV",
+    title: "All Courts",
+    desc: "Supreme Court, High Courts, District Courts, NCLT, Consumer Forums — unified terminal.",
+  },
+  {
+    tag: "SEC",
+    title: "Secure Access",
+    desc: "Row-level security. Your tracked cases are visible only to you. Zero data leakage.",
+  },
+];
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white">
+    <div className="min-h-screen" style={{ background: 'var(--bb-bg)', color: 'var(--bb-white)' }}>
       {/* Nav */}
-      <nav className="border-b border-white/10">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+      <nav style={{ borderBottom: '1px solid var(--bb-amber)', background: '#060a12' }}>
+        <div className="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between">
+          <span className="text-base font-bold tracking-widest" style={{ color: 'var(--bb-amber)' }}>
+            LEXQUANT
+          </span>
           <div className="flex items-center gap-3">
-            <Scale className="w-8 h-8 text-indigo-400" />
-            <span className="text-xl font-bold">Mercury</span>
-          </div>
-          <div className="flex items-center gap-4">
             <Link
               href="/login"
-              className="text-sm text-slate-300 hover:text-white transition-colors"
+              className="text-xs font-semibold uppercase tracking-wider"
+              style={{ color: 'var(--bb-gray)', letterSpacing: '0.08em' }}
             >
               Sign In
             </Link>
             <Link
               href="/login"
-              className="text-sm bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-lg transition-colors"
+              className="bb-btn bb-btn-primary"
+              style={{ fontSize: '0.65rem', padding: '0.4rem 0.8rem' }}
             >
-              Get Started
+              Get Access
             </Link>
           </div>
         </div>
       </nav>
 
-      {/* Hero */}
-      <section className="max-w-6xl mx-auto px-6 py-24 text-center">
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-sm text-indigo-300 mb-6">
-          <Zap className="w-4 h-4" />
-          Free. Open Source. Auto-updating every 30 minutes.
-        </div>
-        <h1 className="text-5xl md:text-6xl font-bold leading-tight">
-          Track Your Court Cases
-          <br />
-          <span className="text-indigo-400">Across All Indian Courts</span>
-        </h1>
-        <p className="text-lg text-slate-400 mt-6 max-w-2xl mx-auto">
-          Monitor cases in the Supreme Court, High Courts, District Courts,
-          NCLT, and Consumer Forums. Get instant alerts when your case status
-          changes via Telegram and Email.
-        </p>
-        <div className="mt-10 flex items-center justify-center gap-4">
-          <Link
-            href="/login"
-            className="px-8 py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl text-lg transition-colors"
-          >
-            Start Tracking
-          </Link>
-          <Link
-            href="/login"
-            className="px-8 py-3.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-medium rounded-xl text-lg transition-colors"
-          >
-            Learn More
-          </Link>
+      {/* Hero - Terminal Boot Screen */}
+      <section className="max-w-4xl mx-auto px-6 py-20">
+        <div className="bb-panel" style={{ padding: '2.5rem' }}>
+          <div style={{ fontFamily: 'var(--bb-font)', lineHeight: 2 }}>
+            <p style={{ color: 'var(--bb-amber)', fontSize: '1.1rem', fontWeight: 700 }}>
+              {'>'} LEXQUANT v1.0
+            </p>
+            <p style={{ color: 'var(--bb-white)', fontSize: '0.9rem' }}>
+              {'>'} INDIAN COURT CASE INTELLIGENCE TERMINAL
+            </p>
+            <p style={{ color: 'var(--bb-gray)', fontSize: '0.8rem' }}>{'>'}</p>
+            <p style={{ color: 'var(--bb-gray)', fontSize: '0.8rem' }}>
+              {'>'} MONITORING: <span style={{ color: 'var(--bb-green)' }}>SUPREME COURT</span> | <span style={{ color: 'var(--bb-green)' }}>HIGH COURTS</span> | <span style={{ color: 'var(--bb-green)' }}>DISTRICT COURTS</span> | <span style={{ color: 'var(--bb-green)' }}>NCLT</span> | <span style={{ color: 'var(--bb-green)' }}>CONSUMER FORUMS</span>
+            </p>
+            <p style={{ color: 'var(--bb-gray)', fontSize: '0.8rem' }}>
+              {'>'} UPDATE FREQUENCY: <span style={{ color: 'var(--bb-amber)' }}>30 MIN</span>
+            </p>
+            <p style={{ color: 'var(--bb-gray)', fontSize: '0.8rem' }}>
+              {'>'} ALERT CHANNELS: <span style={{ color: 'var(--bb-cyan, #4af6c3)' }}>TELEGRAM + EMAIL</span>
+            </p>
+            <p style={{ color: 'var(--bb-gray)', fontSize: '0.8rem' }}>
+              {'>'} AI ENGINE: <span style={{ color: 'var(--bb-amber)' }}>GPT-4o CASE ANALYSIS + CAPTCHA SOLVING</span>
+            </p>
+            <p style={{ color: 'var(--bb-gray)', fontSize: '0.8rem' }}>{'>'}</p>
+          </div>
+          <div className="flex gap-3 mt-6">
+            <Link href="/login" className="bb-btn bb-btn-primary">
+              START TRACKING
+            </Link>
+            <Link href="/login" className="bb-btn bb-btn-secondary">
+              LEARN MORE
+            </Link>
+          </div>
         </div>
       </section>
 
-      {/* Features */}
-      <section className="max-w-6xl mx-auto px-6 py-20">
-        <h2 className="text-3xl font-bold text-center mb-12">
-          Everything you need to track litigation
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <FeatureCard
-            icon={<Bell className="w-6 h-6" />}
-            title="Instant Alerts"
-            description="Get notified via Telegram and Email the moment your case status changes, a new order is uploaded, or a hearing date is updated."
-          />
-          <FeatureCard
-            icon={<Calendar className="w-6 h-6" />}
-            title="Calendar View"
-            description="See all your upcoming hearings in a clean calendar view. Never miss a court date again."
-          />
-          <FeatureCard
-            icon={<Search className="w-6 h-6" />}
-            title="Party Name Search"
-            description="Search across all Indian courts by party name. Find and track any case instantly."
-          />
-          <FeatureCard
-            icon={<Zap className="w-6 h-6" />}
-            title="Auto-Updates Every 30 Min"
-            description="Your cases are checked automatically every 30 minutes. No manual refreshing needed."
-          />
-          <FeatureCard
-            icon={<Scale className="w-6 h-6" />}
-            title="All Courts Covered"
-            description="Supreme Court, all High Courts, District Courts, NCLT, and Consumer Forums - all in one place."
-          />
-          <FeatureCard
-            icon={<Shield className="w-6 h-6" />}
-            title="Secure & Private"
-            description="Your data is protected with row-level security. Only you can see your tracked cases."
-          />
+      {/* Features Grid */}
+      <section className="max-w-6xl mx-auto px-6 pb-20">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-px" style={{ background: 'var(--bb-border)' }}>
+          {features.map((f) => (
+            <div key={f.tag} className="bb-panel" style={{ border: 'none' }}>
+              <div className="bb-panel-header">
+                <span className="bb-panel-title">{f.title}</span>
+                <span className="bb-panel-tag">{f.tag}</span>
+              </div>
+              <div className="bb-panel-body">
+                <p style={{ fontSize: '0.75rem', color: 'var(--bb-gray)', lineHeight: 1.6 }}>
+                  {f.desc}
+                </p>
+              </div>
+            </div>
+          ))}
         </div>
       </section>
 
       {/* CTA */}
-      <section className="max-w-6xl mx-auto px-6 py-20 text-center">
-        <div className="bg-indigo-600/20 border border-indigo-500/30 rounded-2xl p-12">
-          <h2 className="text-3xl font-bold">Ready to track your cases?</h2>
-          <p className="text-slate-400 mt-3">
-            Sign up for free. No credit card required.
+      <section className="max-w-4xl mx-auto px-6 pb-20">
+        <div className="bb-panel text-center" style={{ padding: '2rem' }}>
+          <p className="bb-panel-title" style={{ fontSize: '0.8rem', marginBottom: '0.5rem' }}>
+            READY TO ACCESS THE TERMINAL?
           </p>
-          <Link
-            href="/login"
-            className="inline-block mt-6 px-8 py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl text-lg transition-colors"
-          >
-            Get Started Free
+          <p style={{ color: 'var(--bb-gray)', fontSize: '0.75rem', marginBottom: '1rem' }}>
+            Free to use. No credit card required.
+          </p>
+          <Link href="/login" className="bb-btn bb-btn-primary">
+            GET STARTED FREE
           </Link>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-white/10 py-8">
-        <div className="max-w-6xl mx-auto px-6 text-center text-sm text-slate-500">
-          <p>Mercury Case Tracker - Open Source Indian Court Case Monitoring</p>
-        </div>
+      <footer style={{ borderTop: '1px solid var(--bb-border)', padding: '1rem 0' }}>
+        <p className="text-center" style={{ color: 'var(--bb-gray)', fontSize: '0.6rem', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+          LexQuant — Indian Court Case Intelligence Terminal | Open Source
+        </p>
       </footer>
-    </div>
-  );
-}
-
-function FeatureCard({
-  icon,
-  title,
-  description,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="bg-white/5 border border-white/10 rounded-xl p-6">
-      <div className="p-3 bg-indigo-500/10 rounded-lg w-fit text-indigo-400 mb-4">
-        {icon}
-      </div>
-      <h3 className="text-lg font-semibold mb-2">{title}</h3>
-      <p className="text-sm text-slate-400">{description}</p>
     </div>
   );
 }
