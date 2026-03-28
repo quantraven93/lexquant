@@ -122,6 +122,8 @@ export async function POST(
                 const listRows = [...listHtml.matchAll(/<tr[^>]*>(?!.*<th)([\s\S]*?)<\/tr>/gi)];
                 const hearings = listRows.map(r => {
                   const cells = [...r[0].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)].map(m => stripTags(m[1]));
+                  // Skip header-like rows
+                  if (cells[0]?.includes("CL Date") || cells[0]?.includes("Date")) return null;
                   return cells.length >= 4 ? { date: cells[0], stage: cells[2], purpose: cells[3], judges: cells[5]?.substring(0, 80), remarks: cells[7] } : null;
                 }).filter(Boolean);
                 if (hearings.length > 0) {

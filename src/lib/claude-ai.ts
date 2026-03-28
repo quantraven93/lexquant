@@ -40,7 +40,7 @@ export async function solveCaptchaWithVision(
       : "Read the CAPTCHA text in this image. It contains distorted letters and/or numbers. Reply with ONLY the exact characters shown, nothing else. No spaces, no explanation.";
 
     const response = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-haiku-4-5-20251001",
       max_tokens: 10,
       messages: [
         {
