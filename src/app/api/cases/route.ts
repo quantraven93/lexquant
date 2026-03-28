@@ -99,11 +99,11 @@ export async function POST(request: Request) {
       case_year: caseYear || null,
       cnr_number: cnrNumber || null,
       case_title:
-        caseStatus?.caseTitle ||
+        (caseStatus?.caseTitle && caseStatus.caseTitle !== "Unknown" ? caseStatus.caseTitle : null) ||
         inputTitle ||
         (inputPetitioner && inputRespondent ? `${inputPetitioner} vs ${inputRespondent}` : null) ||
         `Case ${caseType || ""}/${caseNumber || cnrNumber}/${caseYear || ""}`,
-      current_status: caseStatus?.currentStatus || inputStatus || "Unknown",
+      current_status: (caseStatus?.currentStatus && caseStatus.currentStatus !== "Pending" ? caseStatus.currentStatus : null) || inputStatus || caseStatus?.currentStatus || "Unknown",
       next_hearing_date: caseStatus?.nextHearingDate || null,
       last_order_date: caseStatus?.lastOrderDate || null,
       last_order_summary: caseStatus?.lastOrderSummary || null,

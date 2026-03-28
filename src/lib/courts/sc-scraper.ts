@@ -1043,10 +1043,13 @@ export const scProvider: CourtApiProvider = {
       identifier.caseTypeCode
     );
 
+    // Strip leading zeros from case number (SC expects "1536" not "001536")
+    const cleanCaseNumber = identifier.caseNumber.replace(/^0+/, "") || "0";
+
     try {
       return await fetchCaseStatusWithRetry(
         caseTypeCode,
-        identifier.caseNumber,
+        cleanCaseNumber,
         identifier.caseYear
       );
     } catch (error) {
