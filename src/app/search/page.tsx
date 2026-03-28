@@ -39,10 +39,14 @@ export default function SearchPage() {
     if (courtType) params.set("court_type", courtType);
 
     try {
+      console.log("[Search] Fetching /api/search with params:", params.toString());
       const res = await fetch(`/api/search?${params}`);
+      console.log("[Search] Response status:", res.status);
       const data = await res.json();
+      console.log("[Search] Results:", data.results?.length || 0, "error:", data.error);
       setResults(data.results || []);
-    } catch {
+    } catch (err) {
+      console.error("[Search] Fetch error:", err);
       setResults([]);
     }
     setLoading(false);
@@ -120,9 +124,20 @@ export default function SearchPage() {
         </div>
 
         {/* Results */}
-        {searched && (
+        {loading && (
           <div className="bb-panel">
-            {results.length === 0 && !loading ? (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "3rem", gap: "0.5rem" }}>
+              <span className="live-dot" />
+              <span style={{ color: "var(--bb-amber)", fontSize: "0.78rem", letterSpacing: "0.05em" }}>
+                SEARCHING COURTS... SOLVING CAPTCHA... THIS MAY TAKE 10-15 SECONDS
+              </span>
+            </div>
+          </div>
+        )}
+
+        {searched && !loading && (
+          <div className="bb-panel">
+            {results.length === 0 ? (
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "3rem", flexDirection: "column", gap: "0.25rem" }}>
                 <span style={{ color: "var(--bb-gray)", fontSize: "0.78rem" }}>NO RESULTS</span>
                 <span style={{ color: "var(--bb-gray-dim)", fontSize: "0.6rem" }}>Try a different search term</span>
