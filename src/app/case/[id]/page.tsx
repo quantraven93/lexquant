@@ -55,6 +55,7 @@ export default function CaseDetailPage({
   const [saving, setSaving] = useState(false);
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [summarizing, setSummarizing] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -107,6 +108,26 @@ export default function CaseDetailPage({
       return;
     await fetch(`/api/cases/${id}`, { method: "DELETE" });
     router.push("/dashboard");
+  }
+
+  async function refreshCase() {
+    setRefreshing(true);
+    try {
+      const res = await fetch(`/api/cases/${id}/refresh`, { method: "POST" });
+      if (res.ok) {
+        // Reload case data
+        const caseRes = await fetch(`/api/cases/${id}`);
+        const data = await caseRes.json();
+        setCaseData(data.case);
+        setUpdates(data.updates || []);
+      } else {
+        const data = await res.json();
+        alert(data.error || "Refresh failed. Try again.");
+      }
+    } catch {
+      alert("Refresh failed. Try again.");
+    }
+    setRefreshing(false);
   }
 
   async function generateSummary() {
@@ -190,13 +211,23 @@ export default function CaseDetailPage({
                 )}
               </div>
             </div>
-            <button
-              onClick={deleteCase}
-              className="bb-btn bb-btn-danger"
-              style={{ padding: "0.3rem 0.6rem", fontSize: "0.6rem", flexShrink: 0, marginLeft: "0.5rem" }}
-            >
-              [DEL]
-            </button>
+            <div style={{ display: "flex", gap: "0.3rem", flexShrink: 0, marginLeft: "0.5rem" }}>
+              <button
+                onClick={refreshCase}
+                disabled={refreshing}
+                className="bb-btn bb-btn-primary"
+                style={{ padding: "0.3rem 0.6rem", fontSize: "0.6rem", opacity: refreshing ? 0.6 : 1 }}
+              >
+                {refreshing ? "[REFRESHING...]" : "[REFRESH]"}
+              </button>
+              <button
+                onClick={deleteCase}
+                className="bb-btn bb-btn-danger"
+                style={{ padding: "0.3rem 0.6rem", fontSize: "0.6rem" }}
+              >
+                [DEL]
+              </button>
+            </div>
           </div>
         </div>
 
