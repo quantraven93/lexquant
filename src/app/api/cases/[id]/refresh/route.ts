@@ -59,6 +59,16 @@ export async function POST(
     );
   }
 
+  // Convert DD-MM-YYYY dates to YYYY-MM-DD for Supabase
+  function toISO(dateStr?: string): string | null {
+    if (!dateStr) return null;
+    const m = dateStr.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+    if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+    // Already ISO or other format
+    if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) return dateStr.substring(0, 10);
+    return null;
+  }
+
   console.log("[Refresh] Got data:", {
     petitioner: caseStatus.petitioner,
     respondent: caseStatus.respondent,
@@ -88,12 +98,12 @@ export async function POST(
   if (caseStatus.petitionerAdvocate) updateData.petitioner_advocate = caseStatus.petitionerAdvocate;
   if (caseStatus.respondentAdvocate) updateData.respondent_advocate = caseStatus.respondentAdvocate;
   if (caseStatus.judges) updateData.judges = caseStatus.judges;
-  if (caseStatus.nextHearingDate) updateData.next_hearing_date = caseStatus.nextHearingDate;
-  if (caseStatus.lastOrderDate) updateData.last_order_date = caseStatus.lastOrderDate;
+  if (caseStatus.nextHearingDate) { const d = toISO(caseStatus.nextHearingDate); if (d) updateData.next_hearing_date = d; }
+  if (caseStatus.lastOrderDate) { const d = toISO(caseStatus.lastOrderDate); if (d) updateData.last_order_date = d; }
   if (caseStatus.lastOrderSummary) updateData.last_order_summary = caseStatus.lastOrderSummary;
-  if (caseStatus.filingDate) updateData.filing_date = caseStatus.filingDate;
-  if (caseStatus.registrationDate) updateData.registration_date = caseStatus.registrationDate;
-  if (caseStatus.decisionDate) updateData.decision_date = caseStatus.decisionDate;
+  if (caseStatus.filingDate) { const d = toISO(caseStatus.filingDate); if (d) updateData.filing_date = d; }
+  if (caseStatus.registrationDate) { const d = toISO(caseStatus.registrationDate); if (d) updateData.registration_date = d; }
+  if (caseStatus.decisionDate) { const d = toISO(caseStatus.decisionDate); if (d) updateData.decision_date = d; }
   if (caseStatus.rawData) updateData.raw_data = caseStatus.rawData;
 
   const { error: updateError } = await supabase
