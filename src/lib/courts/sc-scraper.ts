@@ -766,6 +766,113 @@ function parseSearchResultsHtml(
   return results;
 }
 
+// ---- SC Case Detail Fetch ----
+
+/**
+ * Fetch detailed case info from SC using diary number.
+ * Uses action=get_case_details (no CAPTCHA needed, reuses session cookies).
+ * Returns rich data: judges, advocates, filing date, hearing history, orders, CNR.
+ */
+async function fetchCaseDetails(
+  diaryNo: string,
+  diaryYear: string,
+  cookies: string
+): Promise<Partial<CaseStatus> | null> {
+  try {
+    const params = new URLSearchParams({
+      action: "get_case_details",
+      diary_no: diaryNo,
+      diary_year: diaryYear,
+      tab_name: "",
+      es_ajax_request: "1",
+      language: "en",
+    });
+
+    const response = await fetch(`${SC_AJAX_URL}?${params.toString()}`, {
+      headers: {
+        "User-Agent": UA,
+        Accept: "application/json, text/javascript, */*; q=0.01",
+        "X-Requested-With": "XMLHttpRequest",
+        Referer: SC_CASE_STATUS_PAGE,
+        Cookie: cookies,
+      },
+      signal: AbortSignal.timeout(15000),
+    });
+
+    if (!response.ok) return null;
+    const data = await response.json();
+    if (!data.success) return null;
+
+    const html = typeof data.data === "string" ? data.data : data.data?.resultsHtml || "";
+    if (!html || html.length < 100) return null;
+
+    console.log(`[SC Detail] Got ${html.length} chars for diary ${diaryNo}/${diaryYear}`);
+
+    const stripTags = (s: string): string =>
+      s.replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").trim();
+
+    // Extract label-value pairs from the detail table
+    const extractDetail = (label: string): string => {
+      const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const match = html.match(
+        new RegExp(`<td[^>]*>\\s*${escaped}\\s*</td>\\s*<td[^>]*>([\\s\\S]*?)</td>`, "i")
+      );
+      return match ? stripTags(match[1]) : "";
+    };
+
+    const judges = (() => {
+      const m = html.match(/Present\/Last Listed On[\s\S]*?<td[^>]*>([\s\S]*?)<\/td>/i);
+      if (m) {
+        const judgeMatch = m[1].match(/\[([^\]]*JUSTICE[^\]]*)\]/i);
+        if (judgeMatch) return judgeMatch[1].replace(/and/gi, ", ").trim();
+      }
+      const statusField = extractDetail("Status/Stage");
+      const jm = statusField.match(/JUDGES?:\s*(.*)/i);
+      return jm ? jm[1].trim() : "";
+    })();
+
+    const lastListedDate = (() => {
+      const m = html.match(/Present\/Last Listed On[\s\S]*?<td[^>]*>[\s\S]*?(\d{2}-\d{2}-\d{4})/i);
+      return m ? m[1] : "";
+    })();
+
+    const filingDate = (() => {
+      const m = extractDetail("Diary Number").match(/Filed on\s+(\d{2}-\d{2}-\d{4})/i);
+      return m ? m[1] : "";
+    })();
+
+    const disposalDate = (() => {
+      const m = extractDetail("Status/Stage").match(/Disposal Date:\s*(\d{2}-\d{2}-\d{4})/i);
+      return m ? m[1] : "";
+    })();
+
+    const petitioner = extractDetail("Petitioner(s)").replace(/^\d+\s*/, "").split(/\d+\s+/)[0]?.trim() || "";
+    const respondent = extractDetail("Respondent(s)").replace(/^\d+\s*/, "").split(/\d+\s+/)[0]?.trim() || "";
+    const petitionerAdvocate = extractDetail("Petitioner Advocate(s)").split(/\n/)[0]?.trim() || "";
+    const respondentAdvocate = extractDetail("Respondent Advocate(s)").split(/\n/)[0]?.trim() || "";
+    const cnrNumber = extractDetail("CNR Number");
+    const category = extractDetail("Category");
+    const currentStatus = extractDetail("Status/Stage").split("(")[0]?.trim() || "";
+
+    return {
+      caseTitle: petitioner && respondent ? `${petitioner} vs ${respondent}` : undefined,
+      currentStatus: currentStatus || undefined,
+      petitioner: petitioner || undefined,
+      respondent: respondent || undefined,
+      petitionerAdvocate: petitionerAdvocate || undefined,
+      respondentAdvocate: respondentAdvocate || undefined,
+      judges: judges || undefined,
+      filingDate: filingDate || undefined,
+      nextHearingDate: lastListedDate || undefined,
+      decisionDate: disposalDate || undefined,
+      rawData: { sourceHtml: html, cnrNumber, category },
+    };
+  } catch (error) {
+    console.error("[SC Detail] Error:", error);
+    return null;
+  }
+}
+
 // ---- API Calls with Retry ----
 
 /**
@@ -864,6 +971,31 @@ async function fetchCaseStatusWithRetry(
           caseNumber,
           year,
         };
+
+        // Try to fetch detailed case info using diary number (no extra CAPTCHA needed)
+        const diaryMatch = resultsHtml.match(/data-diary-no="(\d+)"\s*data-diary-year="(\d{4})"/);
+        if (diaryMatch && session.cookies) {
+          console.log(`[SC Scraper] Fetching detail view for diary ${diaryMatch[1]}/${diaryMatch[2]}`);
+          const details = await fetchCaseDetails(diaryMatch[1], diaryMatch[2], session.cookies);
+          if (details) {
+            // Merge detail data into parsed result
+            if (details.judges) parsed.judges = details.judges;
+            if (details.filingDate) parsed.filingDate = details.filingDate;
+            if (details.petitionerAdvocate) parsed.petitionerAdvocate = details.petitionerAdvocate;
+            if (details.respondentAdvocate) parsed.respondentAdvocate = details.respondentAdvocate;
+            if (details.nextHearingDate) parsed.nextHearingDate = details.nextHearingDate;
+            if (details.decisionDate) parsed.decisionDate = details.decisionDate;
+            if (details.currentStatus) parsed.currentStatus = details.currentStatus;
+            if (details.rawData) {
+              parsed.rawData = { ...parsed.rawData, ...details.rawData };
+            }
+            console.log("[SC Scraper] Detail view merged:", {
+              judges: details.judges,
+              filing: details.filingDate,
+              petAdv: details.petitionerAdvocate,
+            });
+          }
+        }
       }
 
       return parsed;
