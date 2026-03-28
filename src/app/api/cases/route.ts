@@ -55,6 +55,9 @@ export async function POST(request: Request) {
     districtCode,
     courtName,
     caseTitle: inputTitle,
+    petitioner: inputPetitioner,
+    respondent: inputRespondent,
+    status: inputStatus,
   } = body;
 
   const identifier: CaseIdentifier = {
@@ -93,13 +96,14 @@ export async function POST(request: Request) {
       case_title:
         caseStatus?.caseTitle ||
         inputTitle ||
+        (inputPetitioner && inputRespondent ? `${inputPetitioner} vs ${inputRespondent}` : null) ||
         `Case ${caseType || ""}/${caseNumber || cnrNumber}/${caseYear || ""}`,
-      current_status: caseStatus?.currentStatus || "Unknown",
+      current_status: caseStatus?.currentStatus || inputStatus || "Unknown",
       next_hearing_date: caseStatus?.nextHearingDate || null,
       last_order_date: caseStatus?.lastOrderDate || null,
       last_order_summary: caseStatus?.lastOrderSummary || null,
-      petitioner: caseStatus?.petitioner || "",
-      respondent: caseStatus?.respondent || "",
+      petitioner: caseStatus?.petitioner || inputPetitioner || "",
+      respondent: caseStatus?.respondent || inputRespondent || "",
       petitioner_advocate: caseStatus?.petitionerAdvocate || "",
       respondent_advocate: caseStatus?.respondentAdvocate || "",
       judges: caseStatus?.judges || "",

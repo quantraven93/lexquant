@@ -67,6 +67,9 @@ export default function SearchPage() {
           cnrNumber: result.cnrNumber,
           courtName: result.courtName,
           caseTitle: result.caseTitle,
+          petitioner: result.petitioner,
+          respondent: result.respondent,
+          status: result.status,
         }),
       });
 
