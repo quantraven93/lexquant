@@ -3,18 +3,18 @@
  *
  * Scrapes case data directly from sci.gov.in by:
  * 1. Fetching the case status page to obtain session cookies, CSRF token, and CAPTCHA
- * 2. Solving the simple math CAPTCHA via Azure GPT-4o Vision
+ * 2. Solving the simple math CAPTCHA via Claude AI Vision
  * 3. Calling the admin-ajax.php endpoint with all required params
  * 4. Parsing the returned HTML table into structured data
  *
  * CAPTCHA Strategy:
- * - Primary: Azure GPT-4o Vision reads the math expression and returns the answer (~₹0.002/solve)
+ * - Primary: Claude AI Vision reads the math expression and returns the answer (~₹0.002/solve)
  * - Fallback: Pixel-based operator detection (+ vs -) for partial analysis
  * - Retries up to 3 times with fresh CAPTCHA sessions
  */
 
 import { PNG } from "pngjs";
-import { solveCaptchaWithVision, isAzureConfigured } from "@/lib/azure-vision";
+import { solveCaptchaWithVision, isAIConfigured } from "@/lib/claude-ai";
 import type {
   CaseIdentifier,
   CaseStatus,
@@ -46,6 +46,7 @@ const SC_CASE_TYPE_MAP: Record<string, string> = {
   "6": "W.P.(Crl.)",
   "7": "T.P.(C)",
   "8": "T.P.(Crl.)",
+  "31": "Diary",
 };
 
 /** Reverse map: label -> code */
@@ -251,22 +252,22 @@ function detectOperatorFromPixels(
 }
 
 /**
- * Solve the CAPTCHA image using Azure GPT-4o Vision (primary)
+ * Solve the CAPTCHA image using Claude AI Vision (primary)
  * with pixel-based operator detection as fallback.
  *
- * Azure Vision approach: send the raw CAPTCHA image to GPT-4o,
+ * Claude Vision approach: send the raw CAPTCHA image to GPT-4o,
  * which reads the math expression and returns the answer.
  * Cost: ~₹0.002 per solve. Accuracy: ~99%.
  */
 async function solveCaptchaImage(imgBuf: Buffer): Promise<string> {
-  // Primary: Azure GPT-4o Vision (works everywhere, very accurate)
-  if (isAzureConfigured()) {
+  // Primary: Claude AI Vision (works everywhere, very accurate)
+  if (isAIConfigured()) {
     const answer = await solveCaptchaWithVision(imgBuf);
     if (answer) {
-      console.log(`[SC CAPTCHA] Solved via Azure Vision: ${answer}`);
+      console.log(`[SC CAPTCHA] Solved via Claude Vision: ${answer}`);
       return answer;
     }
-    console.warn("[SC CAPTCHA] Azure Vision failed, trying pixel fallback...");
+    console.warn("[SC CAPTCHA] Claude Vision failed, trying pixel fallback...");
   }
 
   // Fallback: Pixel-based operator detection + digit extraction
@@ -275,14 +276,14 @@ async function solveCaptchaImage(imgBuf: Buffer): Promise<string> {
   const operator = detectOperatorFromPixels(bwPng, charRanges);
 
   // Try to guess digits from character range widths (crude but fast)
-  // This is a last-resort fallback when Azure is unavailable
+  // This is a last-resort fallback when Claude is unavailable
   console.warn(
     `[SC CAPTCHA] Pixel fallback: detected operator "${operator}", ${charRanges.length} char ranges`
   );
 
   throw new Error(
-    "CAPTCHA solving failed: Azure Vision not configured or returned no answer. " +
-      "Set AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_KEY environment variables."
+    "CAPTCHA solving failed: Claude Vision not configured or returned no answer. " +
+      "Set ANTHROPIC_API_KEY environment variable."
   );
 }
 
@@ -435,7 +436,7 @@ async function getSession(pageUrl: string = SC_CASE_STATUS_PAGE): Promise<SCSess
 
   const imageBuffer = Buffer.from(await imgResponse.arrayBuffer());
 
-  // Solve CAPTCHA: Azure Vision (primary) → pixel fallback
+  // Solve CAPTCHA: Claude Vision (primary) → pixel fallback
   const captchaAnswer = await solveCaptchaImage(imageBuffer);
   console.log(`[SC Session] CAPTCHA answer: ${captchaAnswer}`);
 
@@ -780,17 +781,30 @@ async function fetchCaseStatusWithRetry(
     try {
       const session = await getSession();
 
-      const params = new URLSearchParams({
-        action: "get_case_status_case_no",
-        case_type: caseTypeCode,
-        case_no: caseNumber,
-        year: year,
-        siwp_captcha_value: session.captchaAnswer,
-        scid: session.scid,
-        [session.tokenName]: session.tokenValue,
-        es_ajax_request: "1",
-        language: "en",
-      });
+      // Diary numbers use a different action and field names
+      const isDiary = caseTypeCode === "31" || caseTypeCode.toUpperCase() === "DIARY";
+      const params = isDiary
+        ? new URLSearchParams({
+            action: "get_case_status_diary_no",
+            diary_no: caseNumber,
+            year: year,
+            siwp_captcha_value: session.captchaAnswer,
+            scid: session.scid,
+            [session.tokenName]: session.tokenValue,
+            es_ajax_request: "1",
+            language: "en",
+          })
+        : new URLSearchParams({
+            action: "get_case_status_case_no",
+            case_type: caseTypeCode,
+            case_no: caseNumber,
+            year: year,
+            siwp_captcha_value: session.captchaAnswer,
+            scid: session.scid,
+            [session.tokenName]: session.tokenValue,
+            es_ajax_request: "1",
+            language: "en",
+          });
 
       const response = await fetch(`${SC_AJAX_URL}?${params.toString()}`, {
         headers: {

@@ -10,11 +10,11 @@
  * - District cases: POST https://services.ecourts.gov.in/ecourtindv2/
  *
  * CAPTCHA Strategy:
- * Uses Azure GPT-4o Vision to solve image-based CAPTCHAs.
+ * Uses Claude AI Vision to solve image-based CAPTCHAs.
  * Cost: ~₹0.002 per solve. Accuracy: ~95%+ for eCourts text CAPTCHAs.
  */
 
-import { solveCaptchaWithVision, isAzureConfigured } from "@/lib/azure-vision";
+import { solveCaptchaWithVision, isAIConfigured } from "@/lib/claude-ai";
 import type {
   CaseIdentifier,
   CaseStatus,
@@ -27,8 +27,8 @@ import type {
 
 // ---- Constants ----
 
-const ECOURTS_DC_BASE = "https://services.ecourts.gov.in/ecourtindv2";
-const ECOURTS_HC_BASE = "https://hcservices.ecourts.gov.in/hcservices";
+const ECOURTS_DC_BASE = "https://services.ecourts.gov.in/ecourtindia_v6";
+const ECOURTS_HC_BASE = "https://hcservices.ecourts.gov.in/ecourtindiaHC";
 
 const COMMON_HEADERS = {
   "User-Agent":
@@ -73,17 +73,18 @@ const STATE_TO_HC: Record<string, string> = {
 interface EcourtsSession {
   cookies: string;
   captchaValue: string;
+  appToken: string;
 }
 
 const MAX_CAPTCHA_RETRIES = 3;
 
 /**
- * Gets a session from the eCourts service with CAPTCHA solved via Azure Vision.
+ * Gets a session from the eCourts service with CAPTCHA solved via Claude Vision.
  *
  * Flow:
  * 1. Fetch the main page → get session cookies
  * 2. Fetch the CAPTCHA image endpoint → get the image
- * 3. Send image to Azure GPT-4o Vision → get text answer
+ * 3. Send image to Claude AI Vision → get text answer
  * 4. Return session with cookies + captcha value
  */
 async function getEcourtsSession(
@@ -115,7 +116,11 @@ async function getEcourtsSession(
 
     const html = await response.text();
 
-    // Step 2: Extract CAPTCHA image URL from the page
+    // Step 2: Extract app_token from hidden field
+    const tokenMatch = html.match(/id=['"]app_token['"][^>]*value=['"]([^'"]*)['"]/i);
+    const appToken = tokenMatch ? tokenMatch[1] : "";
+
+    // Step 3: Extract CAPTCHA image URL from the page
     // eCourts uses various CAPTCHA patterns:
     // <img src="captcha_image.php" id="captcha_image">
     // <img src="/ecourtindv2/securimage/securimage_show.php" ...>
@@ -132,7 +137,7 @@ async function getEcourtsSession(
 
     if (!captchaImgMatch) {
       console.warn("[eCourts] No CAPTCHA image found on page, trying without CAPTCHA...");
-      return { cookies, captchaValue: "" };
+      return { cookies, captchaValue: "", appToken };
     }
 
     let captchaUrl = captchaImgMatch[1].replace(/&amp;/g, "&");
@@ -158,7 +163,7 @@ async function getEcourtsSession(
 
     if (!imgResponse.ok) {
       console.warn(`[eCourts] Failed to fetch CAPTCHA image: ${imgResponse.status}`);
-      return { cookies, captchaValue: "" };
+      return { cookies, captchaValue: "", appToken };
     }
 
     // Update cookies if new ones were set by CAPTCHA request
@@ -170,26 +175,71 @@ async function getEcourtsSession(
       .filter(Boolean)
       .join("; ");
 
-    // Step 4: Solve CAPTCHA using Azure Vision
-    if (!isAzureConfigured()) {
-      console.warn("[eCourts] Azure Vision not configured, cannot solve CAPTCHA");
-      return { cookies: allCookies, captchaValue: "" };
+    // Step 5: Solve CAPTCHA using Claude Vision
+    if (!isAIConfigured()) {
+      console.warn("[eCourts] Claude Vision not configured, cannot solve CAPTCHA");
+      return { cookies: allCookies, captchaValue: "", appToken };
     }
 
     const imageBuffer = Buffer.from(await imgResponse.arrayBuffer());
     const captchaAnswer = await solveCaptchaWithVision(imageBuffer);
 
     if (captchaAnswer) {
-      console.log(`[eCourts] CAPTCHA solved via Azure Vision: "${captchaAnswer}"`);
-      return { cookies: allCookies, captchaValue: captchaAnswer };
+      console.log(`[eCourts] CAPTCHA solved via Claude Vision: "${captchaAnswer}"`);
+      return { cookies: allCookies, captchaValue: captchaAnswer, appToken };
     }
 
-    console.warn("[eCourts] Azure Vision could not solve CAPTCHA");
-    return { cookies: allCookies, captchaValue: "" };
+    console.warn("[eCourts] Claude Vision could not solve CAPTCHA");
+    return { cookies: allCookies, captchaValue: "", appToken };
   } catch (error) {
     console.error("[eCourts] Session fetch error:", error);
     return null;
   }
+}
+
+// ---- v6 Response Helpers ----
+
+/**
+ * eCourts v6 returns JSON: { status: 0|1, errormsg?, div_captcha?, casetype_list|party_data }
+ * status=0 or errormsg="Invalid Captcha" means CAPTCHA failed.
+ * status=1 means success. The actual HTML is in casetype_list or party_data.
+ */
+function parseV6Response(text: string): { success: boolean; html: string } {
+  try {
+    const json = JSON.parse(text);
+    if (json.status === 0 || json.errormsg?.includes("Invalid Captcha")) {
+      return { success: false, html: "" };
+    }
+    const html = json.casetype_list || json.party_data || json.html || "";
+    return { success: true, html };
+  } catch {
+    // Response might be raw HTML page (session expired / wrong URL)
+    if (text.includes("<!DOCTYPE") || text.includes("<html")) {
+      console.warn("[eCourts] Got full HTML page instead of JSON — session issue");
+      return { success: false, html: "" };
+    }
+    if (text.includes("Invalid Captcha") || text.includes("invalid captcha")) {
+      return { success: false, html: "" };
+    }
+    return { success: true, html: text };
+  }
+}
+
+/**
+ * Build the correct eCourts v6 AJAX URL: base + /?p= + endpoint
+ * Also builds POST body with ajax_req and app_token appended.
+ */
+function buildV6Request(
+  baseUrl: string,
+  endpoint: string,
+  params: Record<string, string>,
+  session: EcourtsSession
+): { url: string; body: string } {
+  const url = `${baseUrl}/?p=${endpoint}`;
+  const formData = new URLSearchParams(params);
+  formData.set("ajax_req", "true");
+  formData.set("app_token", session.appToken);
+  return { url, body: formData.toString() };
 }
 
 // ---- HTML Parsing Helpers ----
@@ -516,7 +566,7 @@ function parseEcourtsSearchHtml(
 
 /**
  * Fetches case status from eCourts District Court service by CNR number.
- * Uses Azure Vision to solve CAPTCHA. Retries up to MAX_CAPTCHA_RETRIES times.
+ * Uses Claude Vision to solve CAPTCHA. Retries up to MAX_CAPTCHA_RETRIES times.
  */
 async function fetchDistrictCaseByCNR(
   cnrNumber: string
@@ -526,44 +576,37 @@ async function fetchDistrictCaseByCNR(
     if (!session) return null;
 
     try {
-      const formData = new URLSearchParams({
-        cino: cnrNumber,
-        captcha: session.captchaValue,
-        ajax_req: "true",
+      const { url, body } = buildV6Request(ECOURTS_DC_BASE, "cnr_status/searchByCNR/", {
+        cino: cnrNumber.toUpperCase(),
+        fcaptcha_code: session.captchaValue,
+      }, session);
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          ...COMMON_HEADERS,
+          Cookie: session.cookies,
+          Referer: ECOURTS_DC_BASE,
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        body,
+        signal: AbortSignal.timeout(15000),
       });
 
-      const response = await fetch(
-        `${ECOURTS_DC_BASE}/index.php`,
-        {
-          method: "POST",
-          headers: {
-            ...COMMON_HEADERS,
-            Cookie: session.cookies,
-            Referer: ECOURTS_DC_BASE,
-            "X-Requested-With": "XMLHttpRequest",
-          },
-          body: formData.toString(),
-          signal: AbortSignal.timeout(15000),
-        }
-      );
-
       if (!response.ok) {
-        console.warn(`[eCourts DC] Request failed: ${response.status}`);
+        console.warn(`[eCourts DC] CNR request failed: ${response.status}`);
         return null;
       }
 
-      const html = await response.text();
-
-      // Check if CAPTCHA failed — retry with fresh session
-      if (
-        (html.includes("Invalid Captcha") || html.includes("invalid captcha")) &&
-        attempt < MAX_CAPTCHA_RETRIES
-      ) {
+      const text = await response.text();
+      const parsed = parseV6Response(text);
+      if (!parsed.success) {
         console.warn(`[eCourts DC] CAPTCHA incorrect (attempt ${attempt}/${MAX_CAPTCHA_RETRIES}), retrying...`);
-        continue;
+        if (attempt < MAX_CAPTCHA_RETRIES) continue;
+        return null;
       }
 
-      return parseEcourtsCaseHtml(html);
+      return parseEcourtsCaseHtml(parsed.html);
     } catch (error) {
       console.error("[eCourts DC] fetchDistrictCaseByCNR error:", error);
       if (attempt < MAX_CAPTCHA_RETRIES) continue;
@@ -575,7 +618,7 @@ async function fetchDistrictCaseByCNR(
 
 /**
  * Fetches case status from eCourts High Court service by CNR number.
- * Uses Azure Vision to solve CAPTCHA. Retries up to MAX_CAPTCHA_RETRIES times.
+ * Uses Claude Vision to solve CAPTCHA. Retries up to MAX_CAPTCHA_RETRIES times.
  */
 async function fetchHCCaseByCNR(
   cnrNumber: string
@@ -585,43 +628,29 @@ async function fetchHCCaseByCNR(
     if (!session) return null;
 
     try {
-      const formData = new URLSearchParams({
-        cino: cnrNumber,
-        captcha: session.captchaValue,
-        ajax_req: "true",
+      const { url, body } = buildV6Request(ECOURTS_HC_BASE, "cnr_status/searchByCNR/", {
+        cino: cnrNumber.toUpperCase(),
+        fcaptcha_code: session.captchaValue,
+      }, session);
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { ...COMMON_HEADERS, Cookie: session.cookies, Referer: ECOURTS_HC_BASE, "X-Requested-With": "XMLHttpRequest" },
+        body,
+        signal: AbortSignal.timeout(15000),
       });
 
-      const response = await fetch(
-        `${ECOURTS_HC_BASE}/index.php`,
-        {
-          method: "POST",
-          headers: {
-            ...COMMON_HEADERS,
-            Cookie: session.cookies,
-            Referer: ECOURTS_HC_BASE,
-            "X-Requested-With": "XMLHttpRequest",
-          },
-          body: formData.toString(),
-          signal: AbortSignal.timeout(15000),
-        }
-      );
+      if (!response.ok) { console.warn(`[eCourts HC] CNR request failed: ${response.status}`); return null; }
 
-      if (!response.ok) {
-        console.warn(`[eCourts HC] Request failed: ${response.status}`);
+      const text = await response.text();
+      const parsed = parseV6Response(text);
+      if (!parsed.success) {
+        console.warn(`[eCourts HC] CAPTCHA incorrect (attempt ${attempt}/${MAX_CAPTCHA_RETRIES}), retrying...`);
+        if (attempt < MAX_CAPTCHA_RETRIES) continue;
         return null;
       }
 
-      const html = await response.text();
-
-      if (
-        (html.includes("Invalid Captcha") || html.includes("invalid captcha")) &&
-        attempt < MAX_CAPTCHA_RETRIES
-      ) {
-        console.warn(`[eCourts HC] CAPTCHA incorrect (attempt ${attempt}/${MAX_CAPTCHA_RETRIES}), retrying...`);
-        continue;
-      }
-
-      return parseEcourtsCaseHtml(html);
+      return parseEcourtsCaseHtml(parsed.html);
     } catch (error) {
       console.error("[eCourts HC] fetchHCCaseByCNR error:", error);
       if (attempt < MAX_CAPTCHA_RETRIES) continue;
@@ -633,7 +662,7 @@ async function fetchHCCaseByCNR(
 
 /**
  * Fetches case status from eCourts by case number (District Court).
- * Uses Azure Vision to solve CAPTCHA. Retries up to MAX_CAPTCHA_RETRIES times.
+ * Uses Claude Vision to solve CAPTCHA. Retries up to MAX_CAPTCHA_RETRIES times.
  */
 async function fetchDistrictCaseByNumber(
   identifier: CaseIdentifier
@@ -643,48 +672,35 @@ async function fetchDistrictCaseByNumber(
     if (!session) return null;
 
     try {
-      const formData = new URLSearchParams({
+      const { url, body } = buildV6Request(ECOURTS_DC_BASE, "casestatus/submitCaseNo", {
         case_type: identifier.caseTypeCode || identifier.caseType,
-        case_no: identifier.caseNumber,
+        search_case_no: identifier.caseNumber,
         rgyear: identifier.caseYear,
         state_code: identifier.stateCode || "",
         dist_code: identifier.districtCode || "",
-        court_code: identifier.courtCode || "",
-        captcha: session.captchaValue,
-        ajax_req: "true",
+        court_complex_code: identifier.courtCode || "0",
+        est_code: "0",
+        case_captcha_code: session.captchaValue,
+      }, session);
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { ...COMMON_HEADERS, Cookie: session.cookies, Referer: `${ECOURTS_DC_BASE}/?p=casestatus/index`, "X-Requested-With": "XMLHttpRequest" },
+        body,
+        signal: AbortSignal.timeout(15000),
       });
 
-      const response = await fetch(
-        `${ECOURTS_DC_BASE}/index.php`,
-        {
-          method: "POST",
-          headers: {
-            ...COMMON_HEADERS,
-            Cookie: session.cookies,
-            Referer: ECOURTS_DC_BASE,
-            "X-Requested-With": "XMLHttpRequest",
-          },
-          body: formData.toString(),
-          signal: AbortSignal.timeout(15000),
-        }
-      );
+      if (!response.ok) { console.warn(`[eCourts DC] Case number request failed: ${response.status}`); return null; }
 
-      if (!response.ok) {
-        console.warn(`[eCourts DC] Case number request failed: ${response.status}`);
+      const text = await response.text();
+      const parsed = parseV6Response(text);
+      if (!parsed.success) {
+        console.warn(`[eCourts DC] CAPTCHA incorrect (attempt ${attempt}/${MAX_CAPTCHA_RETRIES}), retrying...`);
+        if (attempt < MAX_CAPTCHA_RETRIES) continue;
         return null;
       }
 
-      const html = await response.text();
-
-      if (
-        (html.includes("Invalid Captcha") || html.includes("invalid captcha")) &&
-        attempt < MAX_CAPTCHA_RETRIES
-      ) {
-        console.warn(`[eCourts DC] CAPTCHA incorrect (attempt ${attempt}/${MAX_CAPTCHA_RETRIES}), retrying...`);
-        continue;
-      }
-
-      return parseEcourtsCaseHtml(html);
+      return parseEcourtsCaseHtml(parsed.html);
     } catch (error) {
       console.error("[eCourts DC] fetchDistrictCaseByNumber error:", error);
       if (attempt < MAX_CAPTCHA_RETRIES) continue;
@@ -696,7 +712,7 @@ async function fetchDistrictCaseByNumber(
 
 /**
  * Fetches case status from eCourts by case number (High Court).
- * Uses Azure Vision to solve CAPTCHA. Retries up to MAX_CAPTCHA_RETRIES times.
+ * Uses Claude Vision to solve CAPTCHA. Retries up to MAX_CAPTCHA_RETRIES times.
  */
 async function fetchHCCaseByNumber(
   identifier: CaseIdentifier
@@ -706,46 +722,32 @@ async function fetchHCCaseByNumber(
     if (!session) return null;
 
     try {
-      const formData = new URLSearchParams({
+      const { url, body } = buildV6Request(ECOURTS_HC_BASE, "casestatus/submitCaseNo", {
         case_type: identifier.caseTypeCode || identifier.caseType,
-        case_no: identifier.caseNumber,
+        search_case_no: identifier.caseNumber,
         rgyear: identifier.caseYear,
         state_code: identifier.stateCode || "",
-        captcha: session.captchaValue,
-        ajax_req: "true",
+        case_captcha_code: session.captchaValue,
+      }, session);
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { ...COMMON_HEADERS, Cookie: session.cookies, Referer: `${ECOURTS_HC_BASE}/?p=casestatus/index`, "X-Requested-With": "XMLHttpRequest" },
+        body,
+        signal: AbortSignal.timeout(15000),
       });
 
-      const response = await fetch(
-        `${ECOURTS_HC_BASE}/index.php`,
-        {
-          method: "POST",
-          headers: {
-            ...COMMON_HEADERS,
-            Cookie: session.cookies,
-            Referer: ECOURTS_HC_BASE,
-            "X-Requested-With": "XMLHttpRequest",
-          },
-          body: formData.toString(),
-          signal: AbortSignal.timeout(15000),
-        }
-      );
+      if (!response.ok) { console.warn(`[eCourts HC] Case number request failed: ${response.status}`); return null; }
 
-      if (!response.ok) {
-        console.warn(`[eCourts HC] Case number request failed: ${response.status}`);
+      const text = await response.text();
+      const parsed = parseV6Response(text);
+      if (!parsed.success) {
+        console.warn(`[eCourts HC] CAPTCHA incorrect (attempt ${attempt}/${MAX_CAPTCHA_RETRIES}), retrying...`);
+        if (attempt < MAX_CAPTCHA_RETRIES) continue;
         return null;
       }
 
-      const html = await response.text();
-
-      if (
-        (html.includes("Invalid Captcha") || html.includes("invalid captcha")) &&
-        attempt < MAX_CAPTCHA_RETRIES
-      ) {
-        console.warn(`[eCourts HC] CAPTCHA incorrect (attempt ${attempt}/${MAX_CAPTCHA_RETRIES}), retrying...`);
-        continue;
-      }
-
-      return parseEcourtsCaseHtml(html);
+      return parseEcourtsCaseHtml(parsed.html);
     } catch (error) {
       console.error("[eCourts HC] fetchHCCaseByNumber error:", error);
       if (attempt < MAX_CAPTCHA_RETRIES) continue;
@@ -757,7 +759,7 @@ async function fetchHCCaseByNumber(
 
 /**
  * Searches for cases by party name on eCourts District Courts.
- * Uses Azure Vision to solve CAPTCHA. Retries up to MAX_CAPTCHA_RETRIES times.
+ * Uses Claude Vision to solve CAPTCHA. Retries up to MAX_CAPTCHA_RETRIES times.
  */
 async function searchDistrictByPartyName(
   partyName: string,
@@ -769,42 +771,35 @@ async function searchDistrictByPartyName(
     if (!session) return [];
 
     try {
-      const formData = new URLSearchParams({
-        partyname: partyName,
+      const { url, body } = buildV6Request(ECOURTS_DC_BASE, "casestatus/submitPartyName", {
+        petres_name: partyName,
         state_code: stateCode || "",
-        rgyear: year || "",
-        captcha: session.captchaValue,
-        ajax_req: "true",
-      });
+        dist_code: "0",
+        court_complex_code: "0",
+        est_code: "0",
+        rgyearP: year || "",
+        case_status: "",
+        fcaptcha_code: session.captchaValue,
+      }, session);
 
-      const response = await fetch(
-        `${ECOURTS_DC_BASE}/index.php`,
-        {
-          method: "POST",
-          headers: {
-            ...COMMON_HEADERS,
-            Cookie: session.cookies,
-            Referer: ECOURTS_DC_BASE,
-            "X-Requested-With": "XMLHttpRequest",
-          },
-          body: formData.toString(),
-          signal: AbortSignal.timeout(15000),
-        }
-      );
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { ...COMMON_HEADERS, Cookie: session.cookies, Referer: `${ECOURTS_DC_BASE}/?p=casestatus/index`, "X-Requested-With": "XMLHttpRequest" },
+        body,
+        signal: AbortSignal.timeout(15000),
+      });
 
       if (!response.ok) return [];
 
-      const html = await response.text();
-
-      if (
-        (html.includes("Invalid Captcha") || html.includes("invalid captcha")) &&
-        attempt < MAX_CAPTCHA_RETRIES
-      ) {
+      const text = await response.text();
+      const parsed = parseV6Response(text);
+      if (!parsed.success) {
         console.warn(`[eCourts DC] Search CAPTCHA incorrect (attempt ${attempt}/${MAX_CAPTCHA_RETRIES}), retrying...`);
-        continue;
+        if (attempt < MAX_CAPTCHA_RETRIES) continue;
+        return [];
       }
 
-      return parseEcourtsSearchHtml(html, "DC");
+      return parseEcourtsSearchHtml(parsed.html, "DC");
     } catch (error) {
       console.error("[eCourts DC] searchByPartyName error:", error);
       if (attempt < MAX_CAPTCHA_RETRIES) continue;
@@ -816,7 +811,7 @@ async function searchDistrictByPartyName(
 
 /**
  * Searches for cases by party name on eCourts High Courts.
- * Uses Azure Vision to solve CAPTCHA. Retries up to MAX_CAPTCHA_RETRIES times.
+ * Uses Claude Vision to solve CAPTCHA. Retries up to MAX_CAPTCHA_RETRIES times.
  */
 async function searchHCByPartyName(
   partyName: string,
@@ -828,42 +823,32 @@ async function searchHCByPartyName(
     if (!session) return [];
 
     try {
-      const formData = new URLSearchParams({
-        partyname: partyName,
+      const { url, body } = buildV6Request(ECOURTS_HC_BASE, "casestatus/submitPartyName", {
+        petres_name: partyName,
         state_code: stateCode || "",
-        rgyear: year || "",
-        captcha: session.captchaValue,
-        ajax_req: "true",
-      });
+        rgyearP: year || "",
+        case_status: "",
+        fcaptcha_code: session.captchaValue,
+      }, session);
 
-      const response = await fetch(
-        `${ECOURTS_HC_BASE}/index.php`,
-        {
-          method: "POST",
-          headers: {
-            ...COMMON_HEADERS,
-            Cookie: session.cookies,
-            Referer: ECOURTS_HC_BASE,
-            "X-Requested-With": "XMLHttpRequest",
-          },
-          body: formData.toString(),
-          signal: AbortSignal.timeout(15000),
-        }
-      );
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { ...COMMON_HEADERS, Cookie: session.cookies, Referer: `${ECOURTS_HC_BASE}/?p=casestatus/index`, "X-Requested-With": "XMLHttpRequest" },
+        body,
+        signal: AbortSignal.timeout(15000),
+      });
 
       if (!response.ok) return [];
 
-      const html = await response.text();
-
-      if (
-        (html.includes("Invalid Captcha") || html.includes("invalid captcha")) &&
-        attempt < MAX_CAPTCHA_RETRIES
-      ) {
+      const text = await response.text();
+      const parsed = parseV6Response(text);
+      if (!parsed.success) {
         console.warn(`[eCourts HC] Search CAPTCHA incorrect (attempt ${attempt}/${MAX_CAPTCHA_RETRIES}), retrying...`);
-        continue;
+        if (attempt < MAX_CAPTCHA_RETRIES) continue;
+        return [];
       }
 
-      return parseEcourtsSearchHtml(html, "HC");
+      return parseEcourtsSearchHtml(parsed.html, "HC");
     } catch (error) {
       console.error("[eCourts HC] searchByPartyName error:", error);
       if (attempt < MAX_CAPTCHA_RETRIES) continue;
