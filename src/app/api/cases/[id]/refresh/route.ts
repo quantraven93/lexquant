@@ -99,11 +99,11 @@ export async function POST(
             const disposalMatch = detailHtml.match(/Disposal Date:\s*(\d{2}-\d{2}-\d{4})/i);
             if (disposalMatch) caseStatus.decisionDate = disposalMatch[1];
 
-            const petAdv = extractDetail("Petitioner Advocate\\(s\\)");
-            if (petAdv) caseStatus.petitionerAdvocate = petAdv.split("\n")[0]?.trim();
+            const petAdv = extractDetail("Petitioner Advocate(s)");
+            if (petAdv) caseStatus.petitionerAdvocate = petAdv.split(/\n|<br/)[0]?.trim();
 
-            const respAdv = extractDetail("Respondent Advocate\\(s\\)");
-            if (respAdv) caseStatus.respondentAdvocate = respAdv.split("\n")[0]?.trim();
+            const respAdv = extractDetail("Respondent Advocate(s)");
+            if (respAdv) caseStatus.respondentAdvocate = respAdv.split(/\n|<br/)[0]?.trim();
 
             const cnr = extractDetail("CNR Number");
             if (cnr) caseStatus.rawData = { ...caseStatus.rawData, cnrNumber: cnr };
