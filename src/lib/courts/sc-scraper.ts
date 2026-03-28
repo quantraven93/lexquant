@@ -531,33 +531,33 @@ function parseResultsHtml(html: string): CaseStatus | null {
     allCells.push(stripTags(tdMatch[1]));
   }
 
-  // SC case status table: Serial, Diary No, Case No, Petitioner, Respondent, Status
+  // SC case status table: Serial(0), Diary No(1), Case No(2), Petitioner(3), Respondent(4), Status(5), Action(6)
+  // Prefer allCells (positional) over extractField (regex) because extractField
+  // can accidentally match <th> headers like "Petitioner Name" → "Respondent Name"
   const petitioner =
+    allCells[3] ||
     extractField("Petitioner") ||
     extractField("Appellant") ||
-    extractField("Petitioner Name") ||
-    allCells[3] ||
     "";
 
   const respondent =
-    extractField("Respondent") ||
-    extractField("Respondent Name") ||
     allCells[4] ||
+    extractField("Respondent") ||
     "";
 
   const currentStatus =
-    extractField("Status") ||
+    allCells[5] ||
     extractField("Case Status") ||
     extractField("Disposal Nature") ||
-    allCells[5] ||
     "Pending";
 
   const caseTitle =
+    (petitioner && respondent && petitioner !== "Respondent Name"
+      ? `${petitioner} vs ${respondent}`
+      : null) ||
     extractField("Case Title") ||
     extractField("Title") ||
-    (petitioner && respondent
-      ? `${petitioner} vs ${respondent}`
-      : petitioner || respondent || "Unknown");
+    petitioner || respondent || "Unknown";
 
   const petitionerAdvocate =
     extractField("Pet\\. Advocate") ||
