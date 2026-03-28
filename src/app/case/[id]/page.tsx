@@ -410,6 +410,74 @@ export default function CaseDetailPage({
           </div>
         </div>
 
+        {/* Hearing History */}
+        {caseData.raw_data?.hearings && (caseData.raw_data.hearings as Array<Record<string, string>>).length > 0 && (
+          <div className="bb-panel">
+            <div className="bb-panel-header">
+              <span className="bb-panel-title">HEARING HISTORY</span>
+              <span className="bb-panel-tag">{(caseData.raw_data.hearings as Array<Record<string, string>>).length}</span>
+            </div>
+            <div style={{ overflowX: "auto" }}>
+              <table className="bb-table">
+                <thead>
+                  <tr>
+                    <th>DATE</th>
+                    <th>PURPOSE</th>
+                    <th>REMARKS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(caseData.raw_data.hearings as Array<Record<string, string>>).map((h, i) => (
+                    <tr key={i}>
+                      <td style={{ whiteSpace: "nowrap", color: "var(--bb-amber)" }}>{h.date}</td>
+                      <td style={{ fontSize: "0.72rem" }}>{h.purpose}</td>
+                      <td style={{ fontSize: "0.72rem", color: h.remarks?.includes("Disposed") ? "var(--bb-green)" : h.remarks?.includes("Adjourned") || h.remarks?.includes("Not taken") ? "var(--bb-red)" : "var(--bb-gray)" }}>
+                        {h.remarks || "-"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Orders */}
+        {caseData.raw_data?.orders && (caseData.raw_data.orders as Array<Record<string, string>>).length > 0 && (
+          <div className="bb-panel">
+            <div className="bb-panel-header">
+              <span className="bb-panel-title">ORDERS & JUDGMENTS</span>
+              <span className="bb-panel-tag">{(caseData.raw_data.orders as Array<Record<string, string>>).length}</span>
+            </div>
+            <table className="bb-table">
+              <thead>
+                <tr>
+                  <th>DATE</th>
+                  <th>TYPE</th>
+                  <th>DOCUMENT</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(caseData.raw_data.orders as Array<Record<string, string>>).map((o, i) => (
+                  <tr key={i}>
+                    <td style={{ whiteSpace: "nowrap", color: "var(--bb-amber)" }}>{o.date}</td>
+                    <td style={{ fontSize: "0.72rem" }}>{o.orderType}</td>
+                    <td>
+                      {o.pdfUrl ? (
+                        <a href={o.pdfUrl} target="_blank" rel="noopener noreferrer"
+                          className="bb-btn bb-btn-secondary"
+                          style={{ padding: "0.15rem 0.4rem", fontSize: "0.55rem" }}>
+                          [VIEW PDF]
+                        </a>
+                      ) : "-"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
         {/* Update History */}
         <div className="bb-panel">
           <div className="bb-panel-header">

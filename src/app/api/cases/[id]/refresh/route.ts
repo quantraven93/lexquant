@@ -109,6 +109,53 @@ export async function POST(
             if (cnr) caseStatus.rawData = { ...caseStatus.rawData, cnrNumber: cnr };
 
             console.log("[Refresh] Detail merged:", { judges: caseStatus.judges, filing: caseStatus.filingDate, petAdv: caseStatus.petitionerAdvocate });
+
+            // Fetch listing dates tab
+            try {
+              const listRes = await fetch(
+                `https://www.sci.gov.in/wp-admin/admin-ajax.php?action=get_case_details&diary_no=${diaryMatch[1]}&diary_year=${diaryMatch[2]}&tab_name=listing_dates&es_ajax_request=1&language=en`,
+                { headers: { "User-Agent": "Mozilla/5.0", "X-Requested-With": "XMLHttpRequest", Cookie: sessionCookies, Referer: "https://www.sci.gov.in/case-status-case-no/" }, signal: AbortSignal.timeout(10000) }
+              );
+              if (listRes.ok) {
+                const listData = await listRes.json();
+                const listHtml = typeof listData.data === "string" ? listData.data : "";
+                const listRows = [...listHtml.matchAll(/<tr[^>]*>(?!.*<th)([\s\S]*?)<\/tr>/gi)];
+                const hearings = listRows.map(r => {
+                  const cells = [...r[0].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)].map(m => stripTags(m[1]));
+                  return cells.length >= 4 ? { date: cells[0], stage: cells[2], purpose: cells[3], judges: cells[5]?.substring(0, 80), remarks: cells[7] } : null;
+                }).filter(Boolean);
+                if (hearings.length > 0) {
+                  caseStatus.hearingHistory = hearings as Array<{ date: string; purpose: string; judge?: string }>;
+                  caseStatus.rawData = { ...caseStatus.rawData, hearings };
+                  console.log(`[Refresh] ${hearings.length} hearing dates found`);
+                }
+              }
+            } catch { /* non-fatal */ }
+
+            // Fetch orders tab
+            try {
+              const ordRes = await fetch(
+                `https://www.sci.gov.in/wp-admin/admin-ajax.php?action=get_case_details&diary_no=${diaryMatch[1]}&diary_year=${diaryMatch[2]}&tab_name=judgement_orders&es_ajax_request=1&language=en`,
+                { headers: { "User-Agent": "Mozilla/5.0", "X-Requested-With": "XMLHttpRequest", Cookie: sessionCookies, Referer: "https://www.sci.gov.in/case-status-case-no/" }, signal: AbortSignal.timeout(10000) }
+              );
+              if (ordRes.ok) {
+                const ordData = await ordRes.json();
+                const ordHtml = typeof ordData.data === "string" ? ordData.data : "";
+                const ordRows = [...ordHtml.matchAll(/<tr[^>]*>(?!.*<th)([\s\S]*?)<\/tr>/gi)];
+                const orders = ordRows.map(r => {
+                  const dateMatch = r[0].match(/(\d{2}-\d{2}-\d{4})/);
+                  const pdfMatch = r[0].match(/href="([^"]*\.pdf[^"]*)"/i);
+                  const typeMatch = r[0].match(/\[(.*?)\]/);
+                  return dateMatch ? { date: dateMatch[1], orderType: typeMatch ? typeMatch[1] : "Order", pdfUrl: pdfMatch ? pdfMatch[1] : undefined } : null;
+                }).filter(Boolean);
+                if (orders.length > 0) {
+                  caseStatus.orders = orders as Array<{ date: string; orderType: string; pdfUrl?: string }>;
+                  caseStatus.lastOrderDate = orders[0]?.date;
+                  caseStatus.rawData = { ...caseStatus.rawData, orders };
+                  console.log(`[Refresh] ${orders.length} orders found`);
+                }
+              }
+            } catch { /* non-fatal */ }
           }
         }
       } catch (detailErr) {
