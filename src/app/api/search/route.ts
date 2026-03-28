@@ -18,7 +18,8 @@ export async function GET(request: Request) {
   const year = searchParams.get("year");
   const searchType = searchParams.get("type") || "party";
 
-  if (!query || query.length < 3) {
+  const trimmedQuery = query?.trim() || "";
+  if (!trimmedQuery || trimmedQuery.length < 3) {
     return NextResponse.json(
       { error: "Query too short (min 3 chars)" },
       { status: 400 }
@@ -28,7 +29,7 @@ export async function GET(request: Request) {
   try {
     // Only search official court sources (sci.gov.in, ecourts.gov.in)
     const results = await courtService.searchByPartyName({
-      partyName: query,
+      partyName: trimmedQuery,
       courtType: courtType || undefined,
       stateCode: stateCode || undefined,
       year: year || undefined,

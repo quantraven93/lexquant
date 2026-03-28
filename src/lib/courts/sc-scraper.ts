@@ -984,12 +984,11 @@ async function searchByPartyNameSC(
   year?: string
 ): Promise<SearchResult[]> {
   const currentYear = new Date().getFullYear();
-  // If caller provides a year, search only that year; otherwise search current year only
-  // (searching 3 years × 2 statuses = 6 CAPTCHA solves = 30+ seconds, too slow)
+  // Search current year and previous year with Pending status
   const yearsToSearch = year
     ? [year]
-    : [String(currentYear)];
-  const statusesToSearch = ["P"]; // Start with Pending only for speed
+    : [String(currentYear), String(currentYear - 1)];
+  const statusesToSearch = ["P", "D"];
 
   const allResults: SearchResult[] = [];
   const seen = new Set<string>();
