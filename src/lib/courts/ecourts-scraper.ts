@@ -30,6 +30,14 @@ import type {
 const ECOURTS_DC_BASE = "https://services.ecourts.gov.in/ecourtindia_v6";
 const ECOURTS_HC_BASE = "https://hcservices.ecourts.gov.in/ecourtindiaHC";
 
+/** State code mapping for High Courts */
+const HC_STATE_CODES: Record<string, string> = {
+  AP: "2", TG: "29", KA: "3", KL: "4", TN: "10", MH: "14",
+  DL: "8", UP: "13", RJ: "9", GJ: "17", MP: "1", WB: "16",
+  BR: "19", JH: "7", OD: "11", HP: "5", UK: "15", CT: "18",
+  JK: "12", SK: "24", TR: "20", ML: "21", MN: "25", AS: "6",
+};
+
 const COMMON_HEADERS = {
   "User-Agent":
     "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
@@ -860,6 +868,155 @@ async function searchHCByPartyName(
 
 // ---- Provider Export ----
 
+// ---- HC-Specific Search (uses old PHP structure, not v6) ----
+
+/**
+ * Gets a session from HC eCourts including CSRF token and CAPTCHA.
+ * HC uses a different page structure: cases/ki_petres.php with csrf-magic.js
+ */
+async function getHCSession(stateCode: string): Promise<{ cookies: string; csrf: string; captchaValue: string } | null> {
+  try {
+    const pageUrl = `${ECOURTS_HC_BASE}/cases/ki_petres.php?state_cd=${stateCode}&dist_cd=1&court_code=1`;
+    const response = await fetch(pageUrl, {
+      headers: { ...COMMON_HEADERS, "Content-Type": "text/html" },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!response.ok) return null;
+
+    const cookies = (response.headers.getSetCookie?.() || []).map(c => c.split(";")[0]).filter(Boolean).join("; ");
+    const html = await response.text();
+
+    const csrfMatch = html.match(/csrfMagicToken = "([^"]+)"/);
+    const csrf = csrfMatch ? csrfMatch[1] : "";
+
+    const captchaMatch = html.match(/\/ecourtindiaHC\/securimage\/securimage_show\.php[^"']*/);
+    if (!captchaMatch || !isAIConfigured()) return { cookies, csrf, captchaValue: "" };
+
+    const imgRes = await fetch(`https://hcservices.ecourts.gov.in${captchaMatch[0]}`, {
+      headers: { Cookie: cookies, "User-Agent": COMMON_HEADERS["User-Agent"], Referer: pageUrl },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!imgRes.ok) return { cookies, csrf, captchaValue: "" };
+
+    const allCookies = [cookies, ...(imgRes.headers.getSetCookie?.() || []).map(c => c.split(";")[0])].filter(Boolean).join("; ");
+    const captchaAnswer = await solveCaptchaWithVision(Buffer.from(await imgRes.arrayBuffer()));
+    if (captchaAnswer) console.log(`[eCourts HC] CAPTCHA solved: "${captchaAnswer}"`);
+    return { cookies: allCookies, csrf, captchaValue: captchaAnswer || "" };
+  } catch (error) {
+    console.error("[eCourts HC] Session error:", error);
+    return null;
+  }
+}
+
+/**
+ * Parse HC pipe-delimited results format.
+ * Format: ID~CASE_NO~PARTIES_HTML~CNR~COURT_CODE~NUM~BENCH~TOKEN##NEXT
+ */
+function parseHCResults(data: string): SearchResult[] {
+  const results: SearchResult[] = [];
+  if (!data || data.length < 10) return results;
+
+  // Remove BOM
+  const clean = data.startsWith("\ufeff") ? data.substring(1) : data;
+  const records = clean.split("##").filter(r => r.trim().length > 5);
+
+  for (const rec of records.slice(0, 100)) { // Limit to 100 results
+    const fields = rec.split("~");
+    if (fields.length < 4) continue;
+
+    const caseNo = fields[1] || "";
+    const partiesHtml = fields[2] || "";
+    const cnr = fields[3] || "";
+    const bench = fields.length > 6 ? fields[6] : "";
+
+    // Parse parties from HTML: "PETITIONER<br/>Versus<br/>RESPONDENT"
+    const parties = partiesHtml.replace(/<br\/?>/gi, "\n").split(/\nVersus\n|\nvs\.?\n/i);
+    const petitioner = parties[0]?.replace(/<[^>]+>/g, "").trim() || "";
+    const respondent = parties[1]?.replace(/<[^>]+>/g, "").trim() || "";
+
+    // Parse case type and number from case number string like "ARBAPPL/50/2022"
+    const caseMatch = caseNo.match(/^([A-Za-z]+)\/?(\d+)\/?(\d{4})$/);
+
+    results.push({
+      caseTitle: petitioner && respondent ? `${petitioner} vs ${respondent}` : caseNo,
+      caseNumber: caseMatch ? caseMatch[2] : caseNo,
+      caseYear: caseMatch ? caseMatch[3] : "",
+      caseType: caseMatch ? caseMatch[1] : "",
+      courtType: "HC" as CourtType,
+      courtName: bench || "High Court",
+      cnrNumber: cnr || undefined,
+      petitioner: petitioner || undefined,
+      respondent: respondent || undefined,
+    });
+  }
+
+  return results;
+}
+
+/**
+ * Search AP HC or Telangana HC by party name.
+ */
+async function searchHCByPartyNameDirect(
+  partyName: string,
+  stateCode: string,
+  year?: string
+): Promise<SearchResult[]> {
+  for (let attempt = 1; attempt <= MAX_CAPTCHA_RETRIES; attempt++) {
+    const session = await getHCSession(stateCode);
+    if (!session) return [];
+
+    try {
+      const formData = new URLSearchParams({
+        __csrf_magic: session.csrf,
+        action_code: "showRecords",
+        state_code: stateCode,
+        dist_code: "1",
+        court_code: "1",
+        f: "Both",
+        petres_name: partyName,
+        rgyear: year || "",
+        captcha: session.captchaValue,
+      });
+
+      const response = await fetch(`${ECOURTS_HC_BASE}/cases/ki_petres_qry.php`, {
+        method: "POST",
+        headers: {
+          ...COMMON_HEADERS,
+          Cookie: session.cookies,
+          Referer: `${ECOURTS_HC_BASE}/cases/ki_petres.php?state_cd=${stateCode}&dist_cd=1&court_code=1`,
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        body: formData.toString(),
+        signal: AbortSignal.timeout(30000),
+      });
+
+      if (!response.ok) return [];
+      const text = await response.text();
+
+      if (text.includes("error1") || text.toLowerCase().includes("invalid captcha")) {
+        console.warn(`[eCourts HC] CAPTCHA incorrect (attempt ${attempt}/${MAX_CAPTCHA_RETRIES})`);
+        if (attempt < MAX_CAPTCHA_RETRIES) continue;
+        return [];
+      }
+      if (text.toLowerCase().includes("invalid input")) {
+        console.warn("[eCourts HC] Invalid input — missing params?");
+        return [];
+      }
+
+      const results = parseHCResults(text);
+      console.log(`[eCourts HC] State ${stateCode}: ${results.length} results for "${partyName}"`);
+      return results;
+    } catch (error) {
+      console.error(`[eCourts HC] Search error (attempt ${attempt}):`, error);
+      if (attempt < MAX_CAPTCHA_RETRIES) continue;
+      return [];
+    }
+  }
+  return [];
+}
+
+// ---- Provider Export ----
+
 export const ecourtsProvider: CourtApiProvider = {
   name: "eCourts Services (ecourts.gov.in)",
 
@@ -868,15 +1025,19 @@ export const ecourtsProvider: CourtApiProvider = {
 
     // Search HC if courtType is HC or not specified
     if (!params.courtType || params.courtType === "HC") {
-      try {
-        const hcResults = await searchHCByPartyName(
-          params.partyName,
-          params.stateCode,
-          params.year
-        );
-        results.push(...hcResults);
-      } catch (error) {
-        console.error("[eCourts] HC party search failed:", error);
+      // Use direct HC scraper for AP and Telangana (or all HCs if no state specified)
+      const stateCodes = params.stateCode && HC_STATE_CODES[params.stateCode]
+        ? [HC_STATE_CODES[params.stateCode]]
+        : ["2", "29"]; // Default: AP + Telangana
+
+      for (const sc of stateCodes) {
+        try {
+          const hcResults = await searchHCByPartyNameDirect(params.partyName, sc, params.year);
+          results.push(...hcResults);
+          console.log(`[eCourts] HC state_cd=${sc}: ${hcResults.length} results`);
+        } catch (error) {
+          console.error(`[eCourts] HC state_cd=${sc} search failed:`, error);
+        }
       }
     }
 
