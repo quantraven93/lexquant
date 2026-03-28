@@ -74,9 +74,14 @@ export async function POST(request: Request) {
 
   let caseStatus = null;
   try {
+    console.log("[POST /api/cases] Fetching case status:", JSON.stringify({ courtType, caseType, caseNumber, caseYear, caseTypeCode }));
     caseStatus = await courtService.getCaseStatus(identifier);
+    console.log("[POST /api/cases] Case status result:", caseStatus ? "GOT DATA" : "NULL");
+    if (caseStatus) {
+      console.log("[POST /api/cases] Petitioner:", caseStatus.petitioner, "Status:", caseStatus.currentStatus);
+    }
   } catch (error) {
-    console.error("Failed to fetch case status:", error);
+    console.error("[POST /api/cases] Failed to fetch case status:", error);
   }
 
   const { data, error } = await supabase
