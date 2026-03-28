@@ -806,15 +806,18 @@ async function fetchCaseStatusWithRetry(
             language: "en",
           });
 
-      const response = await fetch(`${SC_AJAX_URL}?${params.toString()}`, {
+      const response = await fetch(SC_AJAX_URL, {
+        method: "POST",
         headers: {
           "User-Agent": UA,
+          "Content-Type": "application/x-www-form-urlencoded",
           Accept: "application/json, text/javascript, */*; q=0.01",
           "Accept-Language": "en-US,en;q=0.5",
           "X-Requested-With": "XMLHttpRequest",
           Referer: SC_CASE_STATUS_PAGE,
           Cookie: session.cookies,
         },
+        body: params.toString(),
         signal: AbortSignal.timeout(15000),
       });
 
@@ -908,15 +911,18 @@ async function searchPartyNameForYearStatus(
 
       console.log(`[SC Search] year=${year} status=${partyStatus} attempt=${attempt} captcha=${session.captchaAnswer}`);
 
-      const response = await fetch(`${SC_AJAX_URL}?${params.toString()}`, {
+      const response = await fetch(SC_AJAX_URL, {
+        method: "POST",
         headers: {
           "User-Agent": UA,
+          "Content-Type": "application/x-www-form-urlencoded",
           Accept: "application/json, text/javascript, */*; q=0.01",
           "Accept-Language": "en-US,en;q=0.5",
           "X-Requested-With": "XMLHttpRequest",
           Referer: SC_PARTY_SEARCH_PAGE,
           Cookie: session.cookies,
         },
+        body: params.toString(),
         signal: AbortSignal.timeout(15000),
       });
 
@@ -978,11 +984,12 @@ async function searchByPartyNameSC(
   year?: string
 ): Promise<SearchResult[]> {
   const currentYear = new Date().getFullYear();
-  // If caller provides a year, search only that year; otherwise search last 3 years
+  // If caller provides a year, search only that year; otherwise search current year only
+  // (searching 3 years × 2 statuses = 6 CAPTCHA solves = 30+ seconds, too slow)
   const yearsToSearch = year
     ? [year]
-    : [String(currentYear), String(currentYear - 1), String(currentYear - 2)];
-  const statusesToSearch = ["P", "D"]; // Pending and Disposed
+    : [String(currentYear)];
+  const statusesToSearch = ["P"]; // Start with Pending only for speed
 
   const allResults: SearchResult[] = [];
   const seen = new Set<string>();
