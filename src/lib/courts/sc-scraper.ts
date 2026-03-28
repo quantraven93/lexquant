@@ -262,7 +262,7 @@ function detectOperatorFromPixels(
 async function solveCaptchaImage(imgBuf: Buffer): Promise<string> {
   // Primary: Claude AI Vision (works everywhere, very accurate)
   if (isAIConfigured()) {
-    const answer = await solveCaptchaWithVision(imgBuf);
+    const answer = await solveCaptchaWithVision(imgBuf, "math");
     if (answer) {
       console.log(`[SC CAPTCHA] Solved via Claude Vision: ${answer}`);
       return answer;

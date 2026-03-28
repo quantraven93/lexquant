@@ -11,7 +11,7 @@ class CourtService {
   async getCaseStatus(
     identifier: CaseIdentifier
   ): Promise<CaseStatus | null> {
-    // For SC cases, use SC scraper (Azure Vision CAPTCHA)
+    // For SC cases, use SC scraper (Claude Vision CAPTCHA)
     if (identifier.courtType === "SC") {
       try {
         const result = await scProvider.getCaseStatus(identifier);
@@ -58,7 +58,7 @@ class CourtService {
    * 2. eCourts scraper (ecourts.gov.in) — for HC/DC/NCLT/CF
    *
    * No third-party sources like Indian Kanoon.
-   * All CAPTCHA solving uses Azure GPT-4o Vision (~₹0.002 per solve).
+   * All CAPTCHA solving uses Claude AI Vision.
    */
   async searchByPartyName(params: {
     partyName: string;

@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { summarizeCase, isAzureConfigured } from "@/lib/azure-vision";
+import { summarizeCase, isAIConfigured } from "@/lib/claude-ai";
 import { NextResponse } from "next/server";
 
 export async function POST(
@@ -8,7 +8,7 @@ export async function POST(
 ) {
   const { id } = await params;
 
-  if (!isAzureConfigured()) {
+  if (!isAIConfigured()) {
     return NextResponse.json(
       { error: "AI summarization not configured" },
       { status: 503 }

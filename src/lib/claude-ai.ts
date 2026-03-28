@@ -28,11 +28,16 @@ function getClient(): Anthropic {
  * @returns The numeric answer as a string, or null if it fails
  */
 export async function solveCaptchaWithVision(
-  imageBuffer: Buffer
+  imageBuffer: Buffer,
+  type: "text" | "math" = "text"
 ): Promise<string | null> {
   try {
     const client = getClient();
     const base64 = imageBuffer.toString("base64");
+
+    const prompt = type === "math"
+      ? "This image shows a simple math expression like '6 + 4' or '9 - 3'. Calculate the result. Reply with ONLY the numeric answer, nothing else."
+      : "Read the CAPTCHA text in this image. It contains distorted letters and/or numbers. Reply with ONLY the exact characters shown, nothing else. No spaces, no explanation.";
 
     const response = await client.messages.create({
       model: "claude-sonnet-4-20250514",
@@ -51,7 +56,7 @@ export async function solveCaptchaWithVision(
             },
             {
               type: "text",
-              text: "Read the CAPTCHA text in this image. It contains distorted letters and/or numbers. Reply with ONLY the exact characters shown, nothing else. No spaces, no explanation.",
+              text: prompt,
             },
           ],
         },
