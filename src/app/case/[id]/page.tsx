@@ -29,7 +29,8 @@ interface CaseDetail {
   tags: string[];
   notes: string;
   last_checked_at: string | null;
-  raw_data: Record<string, unknown>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  raw_data: Record<string, any>;
 }
 
 interface CaseUpdate {
@@ -429,10 +430,10 @@ export default function CaseDetailPage({
                 <tbody>
                   {(caseData.raw_data.hearings as Array<Record<string, string>>).map((h, i) => (
                     <tr key={i}>
-                      <td style={{ whiteSpace: "nowrap", color: "var(--bb-amber)" }}>{h.date}</td>
-                      <td style={{ fontSize: "0.72rem" }}>{h.purpose}</td>
-                      <td style={{ fontSize: "0.72rem", color: h.remarks?.includes("Disposed") ? "var(--bb-green)" : h.remarks?.includes("Adjourned") || h.remarks?.includes("Not taken") ? "var(--bb-red)" : "var(--bb-gray)" }}>
-                        {h.remarks || "-"}
+                      <td style={{ whiteSpace: "nowrap", color: "var(--bb-amber)" }}>{String(h.date || "")}</td>
+                      <td style={{ fontSize: "0.72rem" }}>{String(h.purpose || "")}</td>
+                      <td style={{ fontSize: "0.72rem", color: String(h.remarks || "").includes("Disposed") ? "var(--bb-green)" : String(h.remarks || "").includes("Adjourned") || String(h.remarks || "").includes("Not taken") ? "var(--bb-red)" : "var(--bb-gray)" }}>
+                        {String(h.remarks || "-")}
                       </td>
                     </tr>
                   ))}
@@ -460,8 +461,8 @@ export default function CaseDetailPage({
               <tbody>
                 {(caseData.raw_data.orders as Array<Record<string, string>>).map((o, i) => (
                   <tr key={i}>
-                    <td style={{ whiteSpace: "nowrap", color: "var(--bb-amber)" }}>{o.date}</td>
-                    <td style={{ fontSize: "0.72rem" }}>{o.orderType}</td>
+                    <td style={{ whiteSpace: "nowrap", color: "var(--bb-amber)" }}>{String(o.date || "")}</td>
+                    <td style={{ fontSize: "0.72rem" }}>{String(o.orderType || "")}</td>
                     <td>
                       {o.pdfUrl ? (
                         <a href={o.pdfUrl} target="_blank" rel="noopener noreferrer"
