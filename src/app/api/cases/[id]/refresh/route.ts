@@ -52,6 +52,71 @@ export async function POST(
     console.error("[Refresh] Failed:", error);
   }
 
+  // For SC cases, try to fetch detailed view using diary number
+  // This gets judges, advocates, filing date, CNR, etc.
+  if (caseData.court_type === "SC" && caseStatus?.rawData?.sourceHtml) {
+    const diaryMatch = (caseStatus.rawData.sourceHtml as string).match(/data-diary-no="(\d+)"\s*data-diary-year="(\d{4})"/);
+    if (diaryMatch) {
+      console.log(`[Refresh] Fetching SC detail for diary ${diaryMatch[1]}/${diaryMatch[2]}`);
+      try {
+        // Get a fresh session page (just for cookies, no CAPTCHA needed for detail)
+        const sessionRes = await fetch("https://www.sci.gov.in/case-status-case-no/", {
+          headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" },
+          signal: AbortSignal.timeout(10000),
+        });
+        const sessionCookies = (sessionRes.headers.getSetCookie?.() || []).map(c => c.split(";")[0]).filter(Boolean).join("; ");
+
+        const detailRes = await fetch(
+          `https://www.sci.gov.in/wp-admin/admin-ajax.php?action=get_case_details&diary_no=${diaryMatch[1]}&diary_year=${diaryMatch[2]}&tab_name=&es_ajax_request=1&language=en`,
+          {
+            headers: {
+              "User-Agent": "Mozilla/5.0",
+              "X-Requested-With": "XMLHttpRequest",
+              Referer: "https://www.sci.gov.in/case-status-case-no/",
+              Cookie: sessionCookies,
+            },
+            signal: AbortSignal.timeout(15000),
+          }
+        );
+
+        if (detailRes.ok) {
+          const detailData = await detailRes.json();
+          const detailHtml = typeof detailData.data === "string" ? detailData.data : "";
+          if (detailHtml.length > 100) {
+            console.log(`[Refresh] SC detail HTML: ${detailHtml.length} chars`);
+            const stripTags = (s: string) => s.replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").trim();
+            const extractDetail = (label: string) => {
+              const m = detailHtml.match(new RegExp(`<td[^>]*>\\s*${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*</td>\\s*<td[^>]*>([\\s\\S]*?)</td>`, "i"));
+              return m ? stripTags(m[1]) : "";
+            };
+
+            const judgesMatch = detailHtml.match(/Present\/Last Listed On[\s\S]*?<td[^>]*>[\s\S]*?\[([\s\S]*?JUSTICE[\s\S]*?)\]/i);
+            if (judgesMatch) caseStatus.judges = stripTags(judgesMatch[1]).replace(/and/gi, ", ").trim();
+
+            const filingMatch = detailHtml.match(/Filed on\s+(\d{2}-\d{2}-\d{4})/i);
+            if (filingMatch) caseStatus.filingDate = filingMatch[1];
+
+            const disposalMatch = detailHtml.match(/Disposal Date:\s*(\d{2}-\d{2}-\d{4})/i);
+            if (disposalMatch) caseStatus.decisionDate = disposalMatch[1];
+
+            const petAdv = extractDetail("Petitioner Advocate\\(s\\)");
+            if (petAdv) caseStatus.petitionerAdvocate = petAdv.split("\n")[0]?.trim();
+
+            const respAdv = extractDetail("Respondent Advocate\\(s\\)");
+            if (respAdv) caseStatus.respondentAdvocate = respAdv.split("\n")[0]?.trim();
+
+            const cnr = extractDetail("CNR Number");
+            if (cnr) caseStatus.rawData = { ...caseStatus.rawData, cnrNumber: cnr };
+
+            console.log("[Refresh] Detail merged:", { judges: caseStatus.judges, filing: caseStatus.filingDate, petAdv: caseStatus.petitionerAdvocate });
+          }
+        }
+      } catch (detailErr) {
+        console.warn("[Refresh] SC detail fetch failed:", detailErr);
+      }
+    }
+  }
+
   if (!caseStatus) {
     return NextResponse.json(
       { error: "Could not fetch case details from court. CAPTCHA may have failed. Try again." },

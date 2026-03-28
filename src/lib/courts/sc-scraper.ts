@@ -973,6 +973,7 @@ async function fetchCaseStatusWithRetry(
         };
 
         // Try to fetch detailed case info using diary number (no extra CAPTCHA needed)
+        console.log(`[SC Scraper] Parsed OK. Looking for diary in ${resultsHtml.length} chars. Has data-diary-no: ${resultsHtml.includes('data-diary-no')}`);
         const diaryMatch = resultsHtml.match(/data-diary-no="(\d+)"\s*data-diary-year="(\d{4})"/);
         if (diaryMatch && session.cookies) {
           console.log(`[SC Scraper] Fetching detail view for diary ${diaryMatch[1]}/${diaryMatch[2]}`);
