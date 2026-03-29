@@ -32,19 +32,21 @@ export async function solveCaptchaWithVision(
   type: "text" | "math" = "text"
 ): Promise<string | null> {
   // Try free solver first (Sharp + Tesseract.js, $0)
-  try {
-    const { solveCaptchaFree, solveMathCaptchaFree } = await import("@/lib/captcha-free");
-    const freeResult = type === "math"
-      ? await solveMathCaptchaFree(imageBuffer)
-      : await solveCaptchaFree(imageBuffer);
-    if (freeResult) {
-      console.log(`[CAPTCHA] Solved FREE (${type}): "${freeResult}"`);
-      return freeResult;
-    }
-    console.log(`[CAPTCHA] Free solver failed, falling back to Claude Haiku...`);
-  } catch (freeErr) {
-    console.warn("[CAPTCHA] Free solver error, falling back to Claude:", freeErr);
-  }
+  // Disabled: tesseract.js worker script incompatible with Next.js Turbopack
+  // TODO: Re-enable when tesseract.js supports Turbopack, or use native tesseract binary
+  // try {
+  //   const { solveCaptchaFree, solveMathCaptchaFree } = await import("@/lib/captcha-free");
+  //   const freeResult = type === "math"
+  //     ? await solveMathCaptchaFree(imageBuffer)
+  //     : await solveCaptchaFree(imageBuffer);
+  //   if (freeResult) {
+  //     console.log(`[CAPTCHA] Solved FREE (${type}): "${freeResult}"`);
+  //     return freeResult;
+  //   }
+  //   console.log(`[CAPTCHA] Free solver failed, falling back to Claude Haiku...`);
+  // } catch (freeErr) {
+  //   console.warn("[CAPTCHA] Free solver error, falling back to Claude:", freeErr);
+  // }
 
   // Fallback: Claude Haiku Vision ($0.001/solve)
   try {
