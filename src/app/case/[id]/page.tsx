@@ -12,6 +12,7 @@ interface CaseDetail {
   case_title: string;
   court_type: string;
   court_name: string | null;
+  case_type: string | null;
   case_number: string;
   case_year: string | null;
   cnr_number: string | null;
@@ -193,7 +194,7 @@ export default function CaseDetailPage({
             <div style={{ background: "var(--bb-panel)", padding: "0.6rem 0.75rem" }}>
               <div className="bb-kv" style={{ borderBottom: "none", paddingBottom: "0.15rem" }}>
                 <span className="bb-kv-label">CASE NO</span>
-                <span className="bb-kv-value">{caseData.case_number}/{caseData.case_year}</span>
+                <span className="bb-kv-value">{caseData.case_type ? `${caseData.case_type} ` : ""}{caseData.case_number}/{caseData.case_year}</span>
               </div>
               {caseData.filing_date && (
                 <div className="bb-kv" style={{ borderBottom: "none", paddingBottom: "0.15rem" }}>
