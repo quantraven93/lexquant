@@ -58,6 +58,8 @@ export default function SearchPage() {
     params.set("type", tab);
     if (courtType) params.set("court_type", courtType);
     if (stateCode) params.set("state_code", stateCode);
+    if (hcCode) params.set("hc_code", hcCode);
+    if (district) params.set("district", district);
     if (year) params.set("year", year);
 
     switch (tab) {
