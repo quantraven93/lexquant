@@ -1,10 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { DashboardShell } from "@/components/DashboardShell";
-import { INDIAN_STATES } from "@/lib/utils";
-import { COURT_HIERARCHY, HIGH_COURTS, SC_CASE_TYPES, getDistricts } from "@/lib/court-data";
+import { COURT_HIERARCHY, HIGH_COURTS, SC_CASE_TYPES } from "@/lib/court-data";
 
 interface SearchResult {
   caseTitle: string;
@@ -28,10 +27,15 @@ const YEARS = Array.from({ length: 30 }, (_, i) => String(new Date().getFullYear
 export default function SearchPage() {
   const [tab, setTab] = useState<SearchTab>("party");
   const [courtType, setCourtType] = useState("");
-  const [hcCode, setHcCode] = useState(""); // HC specific court code (state_cd)
+  const [hcCode, setHcCode] = useState("");
   const [stateCode, setStateCode] = useState("");
   const [district, setDistrict] = useState("");
+  const [courtComplex, setCourtComplex] = useState("");
   const [year, setYear] = useState("");
+  // Dynamic dropdown data from eCourts API
+  const [districts, setDistricts] = useState<Array<{value: string; label: string}>>([]);
+  const [complexes, setComplexes] = useState<Array<{value: string; label: string}>>([]);
+  const [loadingDropdown, setLoadingDropdown] = useState(false);
   // Party name fields
   const [partyName, setPartyName] = useState("");
   // Case number fields
@@ -41,6 +45,47 @@ export default function SearchPage() {
   const [advocateName, setAdvocateName] = useState("");
   // CNR field
   const [cnrNumber, setCnrNumber] = useState("");
+
+  // DC state codes mapping (eCourts uses different codes than our INDIAN_STATES)
+  const DC_STATES = [
+    { code: "2", name: "Andhra Pradesh" }, { code: "6", name: "Assam" }, { code: "8", name: "Bihar" },
+    { code: "27", name: "Chandigarh" }, { code: "18", name: "Chhattisgarh" }, { code: "26", name: "Delhi" },
+    { code: "30", name: "Goa" }, { code: "17", name: "Gujarat" }, { code: "14", name: "Haryana" },
+    { code: "5", name: "Himachal Pradesh" }, { code: "12", name: "J&K" }, { code: "7", name: "Jharkhand" },
+    { code: "3", name: "Karnataka" }, { code: "4", name: "Kerala" }, { code: "23", name: "Madhya Pradesh" },
+    { code: "1", name: "Maharashtra" }, { code: "25", name: "Manipur" }, { code: "21", name: "Meghalaya" },
+    { code: "11", name: "Odisha" }, { code: "22", name: "Punjab" }, { code: "9", name: "Rajasthan" },
+    { code: "24", name: "Sikkim" }, { code: "10", name: "Tamil Nadu" }, { code: "29", name: "Telangana" },
+    { code: "20", name: "Tripura" }, { code: "15", name: "Uttarakhand" }, { code: "13", name: "Uttar Pradesh" },
+    { code: "16", name: "West Bengal" },
+  ];
+
+  // Load districts when state changes
+  const loadDistricts = useCallback(async (sc: string) => {
+    if (!sc) { setDistricts([]); return; }
+    setLoadingDropdown(true);
+    try {
+      const res = await fetch(`/api/courts?action=districts&state_code=${sc}`);
+      const data = await res.json();
+      setDistricts(data.districts || []);
+    } catch { setDistricts([]); }
+    setLoadingDropdown(false);
+  }, []);
+
+  // Load court complexes when district changes
+  const loadComplexes = useCallback(async (sc: string, dc: string) => {
+    if (!sc || !dc) { setComplexes([]); return; }
+    setLoadingDropdown(true);
+    try {
+      const res = await fetch(`/api/courts?action=complexes&state_code=${sc}&dist_code=${dc}`);
+      const data = await res.json();
+      setComplexes(data.complexes || []);
+    } catch { setComplexes([]); }
+    setLoadingDropdown(false);
+  }, []);
+
+  useEffect(() => { if (courtType === "DC" && stateCode) loadDistricts(stateCode); }, [courtType, stateCode, loadDistricts]);
+  useEffect(() => { if (courtType === "DC" && stateCode && district) loadComplexes(stateCode, district); }, [courtType, stateCode, district, loadComplexes]);
 
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -155,12 +200,12 @@ export default function SearchPage() {
           <div className="bb-panel-body" style={{ padding: "1rem" }}>
             <form onSubmit={handleSearch}>
               {/* Cascading court selector */}
-              <div style={{ display: "grid", gridTemplateColumns: courtType === "DC" ? "1fr 1fr 1fr" : courtType === "HC" ? "1fr 1fr" : "1fr", gap: "0.5rem", marginBottom: "0.75rem" }}>
+              <div style={{ display: "grid", gridTemplateColumns: courtType === "DC" ? "1fr 1fr 1fr 1fr" : courtType === "HC" ? "1fr 1fr" : "1fr", gap: "0.5rem", marginBottom: "0.75rem" }}>
                 <div>
                   <label style={{ display: "block", fontSize: "0.6rem", color: "var(--bb-gray)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.25rem", fontWeight: 600 }}>
                     HEARING COURT
                   </label>
-                  <select value={courtType} onChange={(e) => { setCourtType(e.target.value); setHcCode(""); setStateCode(""); setDistrict(""); }} style={{ width: "100%" }}>
+                  <select value={courtType} onChange={(e) => { setCourtType(e.target.value); setHcCode(""); setStateCode(""); setDistrict(""); setCourtComplex(""); setDistricts([]); setComplexes([]); }} style={{ width: "100%" }}>
                     <option value="">All Courts</option>
                     {COURT_HIERARCHY.map((ct) => (
                       <option key={ct.value} value={ct.value}>{ct.label}</option>
@@ -183,31 +228,46 @@ export default function SearchPage() {
                   </div>
                 )}
 
-                {/* DC: Show State selector */}
+                {/* DC: State selector */}
                 {courtType === "DC" && (
                   <div>
                     <label style={{ display: "block", fontSize: "0.6rem", color: "var(--bb-gray)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.25rem", fontWeight: 600 }}>
                       STATE
                     </label>
-                    <select value={stateCode} onChange={(e) => { setStateCode(e.target.value); setDistrict(""); }} style={{ width: "100%" }}>
+                    <select value={stateCode} onChange={(e) => { setStateCode(e.target.value); setDistrict(""); setCourtComplex(""); setComplexes([]); }} style={{ width: "100%" }}>
                       <option value="">Select State</option>
-                      {INDIAN_STATES.map((s) => (
+                      {DC_STATES.map((s) => (
                         <option key={s.code} value={s.code}>{s.name}</option>
                       ))}
                     </select>
                   </div>
                 )}
 
-                {/* DC: Show District selector */}
-                {courtType === "DC" && stateCode && getDistricts(stateCode).length > 0 && (
+                {/* DC: District selector (dynamic from eCourts) */}
+                {courtType === "DC" && stateCode && (
                   <div>
                     <label style={{ display: "block", fontSize: "0.6rem", color: "var(--bb-gray)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.25rem", fontWeight: 600 }}>
-                      DISTRICT
+                      DISTRICT {loadingDropdown && "..."}
                     </label>
-                    <select value={district} onChange={(e) => setDistrict(e.target.value)} style={{ width: "100%" }}>
-                      <option value="">All Districts</option>
-                      {getDistricts(stateCode).map((d) => (
+                    <select value={district} onChange={(e) => { setDistrict(e.target.value); setCourtComplex(""); }} style={{ width: "100%" }}>
+                      <option value="">Select District</option>
+                      {districts.map((d) => (
                         <option key={d.value} value={d.value}>{d.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* DC: Court Complex selector (dynamic from eCourts) */}
+                {courtType === "DC" && district && (
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.6rem", color: "var(--bb-gray)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.25rem", fontWeight: 600 }}>
+                      COURT/BENCH {loadingDropdown && "..."}
+                    </label>
+                    <select value={courtComplex} onChange={(e) => setCourtComplex(e.target.value)} style={{ width: "100%" }}>
+                      <option value="">Select Court</option>
+                      {complexes.map((c) => (
+                        <option key={c.value} value={c.value}>{c.label}</option>
                       ))}
                     </select>
                   </div>
