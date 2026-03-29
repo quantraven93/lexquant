@@ -45,13 +45,128 @@ export async function POST(
 
   console.log("[Refresh] Fetching case status:", JSON.stringify(identifier));
 
-  // HC cases: the getCaseStatus scraper uses wrong endpoints for HC
-  // HC detail fetch needs its own scraper (cases/o_civil_case_history.php)
-  // For now, skip scraping and return existing data
-  if (caseData.court_type === "HC") {
-    // Update last_checked_at
-    await supabase.from("cases").update({ last_checked_at: new Date().toISOString() }).eq("id", id);
-    return NextResponse.json({ success: true, updated: 1, note: "HC detail scraper not yet implemented. Case data preserved from search." });
+  // HC cases: fetch detail via search → token → o_civil_case_history.php
+  if (caseData.court_type === "HC" && caseData.petitioner) {
+    console.log("[Refresh HC] Fetching detail for:", caseData.case_title);
+    try {
+      const { solveCaptchaWithVision } = await import("@/lib/claude-ai");
+      const HC_BASE = "https://hcservices.ecourts.gov.in/ecourtindiaHC";
+      const stateCode = caseData.state_code || "2"; // Default AP
+
+      // Step 1: Get session + CSRF + CAPTCHA
+      const pageRes = await fetch(`${HC_BASE}/cases/ki_petres.php?state_cd=${stateCode}&dist_cd=1&court_code=1`, {
+        headers: { "User-Agent": "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36" },
+        signal: AbortSignal.timeout(15000),
+      });
+      const pageCookies = (pageRes.headers.getSetCookie?.() || []).map(c => c.split(";")[0]).filter(Boolean).join("; ");
+      const pageHtml = await pageRes.text();
+      const csrf = pageHtml.match(/csrfMagicToken = "([^"]+)"/)?.[1] || "";
+      const capPath = pageHtml.match(/\/ecourtindiaHC\/securimage\/securimage_show\.php[^"']*/)?.[0] || "";
+
+      if (!csrf || !capPath) throw new Error("Could not get HC session");
+
+      // Step 2: Solve CAPTCHA
+      const capRes = await fetch(`https://hcservices.ecourts.gov.in${capPath}`, {
+        headers: { Cookie: pageCookies, "User-Agent": "Mozilla/5.0", Referer: `${HC_BASE}/cases/ki_petres.php` },
+        signal: AbortSignal.timeout(10000),
+      });
+      const allCookies = [pageCookies, ...(capRes.headers.getSetCookie?.() || []).map(c => c.split(";")[0])].filter(Boolean).join("; ");
+      const capAnswer = await solveCaptchaWithVision(Buffer.from(await capRes.arrayBuffer()), "text");
+      if (!capAnswer) throw new Error("CAPTCHA solve failed");
+      console.log(`[Refresh HC] CAPTCHA: ${capAnswer}`);
+
+      // Step 3: Search by party name to get token
+      const searchName = (caseData.petitioner || "").split(" ").slice(0, 2).join(" "); // First 2 words
+      const searchBody = new URLSearchParams({
+        __csrf_magic: csrf, action_code: "showRecords",
+        state_code: stateCode, dist_code: "1", court_code: "1",
+        f: "Both", petres_name: searchName, rgyear: caseData.case_year || "", captcha: capAnswer,
+      });
+      const searchRes = await fetch(`${HC_BASE}/cases/ki_petres_qry.php`, {
+        method: "POST", headers: { "User-Agent": "Mozilla/5.0", "Content-Type": "application/x-www-form-urlencoded",
+          "X-Requested-With": "XMLHttpRequest", Cookie: allCookies, Referer: `${HC_BASE}/cases/ki_petres.php?state_cd=${stateCode}&dist_cd=1&court_code=1` },
+        body: searchBody.toString(), signal: AbortSignal.timeout(30000),
+      });
+      const searchText = await searchRes.text();
+      if (searchText.length < 50 || searchText.includes("error1")) throw new Error("HC search failed or CAPTCHA wrong");
+
+      // Find matching record by CNR
+      const clean = searchText.startsWith("\ufeff") ? searchText.substring(1) : searchText;
+      const targetCnr = caseData.cnr_number || "";
+      let hcCaseId = "", hcToken = "";
+      for (const rec of clean.split("##")) {
+        const fields = rec.split("~");
+        if (fields.length >= 8 && fields[3] === targetCnr) {
+          hcCaseId = fields[0]; hcToken = fields[7];
+          break;
+        }
+      }
+      // If no CNR match, try first record
+      if (!hcCaseId) {
+        const fields = clean.split("##")[0]?.split("~") || [];
+        if (fields.length >= 8) { hcCaseId = fields[0]; hcToken = fields[7]; }
+      }
+
+      if (!hcCaseId || !hcToken) throw new Error("Could not find case in HC search results");
+      console.log(`[Refresh HC] Found token for case ${hcCaseId}`);
+
+      // Step 4: Fetch case detail
+      const detailBody = new URLSearchParams({
+        __csrf_magic: csrf, court_code: "1", state_code: stateCode, dist_code: "1",
+        case_no: hcCaseId, cino: targetCnr || "", token: hcToken, appFlag: "",
+      });
+      const detailRes = await fetch(`${HC_BASE}/cases/o_civil_case_history.php`, {
+        method: "POST", headers: { "User-Agent": "Mozilla/5.0", "Content-Type": "application/x-www-form-urlencoded",
+          "X-Requested-With": "XMLHttpRequest", Cookie: allCookies, Referer: `${HC_BASE}/cases/ki_petres.php?state_cd=${stateCode}&dist_cd=1&court_code=1` },
+        body: detailBody.toString(), signal: AbortSignal.timeout(30000),
+      });
+      const detailHtml = await detailRes.text();
+      console.log(`[Refresh HC] Detail: ${detailHtml.length} chars`);
+
+      if (detailHtml.length < 200) throw new Error("HC detail response too short");
+
+      // Step 5: Parse detail HTML
+      const stripTags = (s: string) => s.replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").trim();
+
+      const filingDate = detailHtml.match(/Filing Date.*?:\s*(\d{2}-\d{2}-\d{4})/i)?.[1] || "";
+      const regDate = detailHtml.match(/Registration Date.*?:\s*(\d{2}-\d{2}-\d{4})/i)?.[1] || "";
+      const nextHearing = detailHtml.match(/Next Hearing Date.*?:\s*([^<]+)/i)?.[1]?.trim() || "";
+      const stage = detailHtml.match(/Stage of Case.*?:\s*([^<]+)/i)?.[1]?.trim() || "";
+      const judgeMatch = detailHtml.match(/Judge.*?<\/t[dh]>\s*<t[dh][^>]*>(.*?)<\/t[dh]>/i);
+      const judge = judgeMatch ? stripTags(judgeMatch[1]).split(",")[0]?.trim() : "";
+
+      // Convert DD-MM-YYYY to YYYY-MM-DD
+      function toISO(d: string): string | null {
+        const m = d.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+        return m ? `${m[3]}-${m[2]}-${m[1]}` : null;
+      }
+
+      // Convert "23rd March 2026" to ISO
+      function parseHCDate(d: string): string | null {
+        const m = d.match(/(\d{1,2})(?:st|nd|rd|th)?\s+(\w+)\s+(\d{4})/i);
+        if (!m) return toISO(d);
+        const months: Record<string, string> = { january:"01",february:"02",march:"03",april:"04",may:"05",june:"06",july:"07",august:"08",september:"09",october:"10",november:"11",december:"12" };
+        const mon = months[m[2].toLowerCase()];
+        return mon ? `${m[3]}-${mon}-${m[1].padStart(2,"0")}` : null;
+      }
+
+      const updateData: Record<string, unknown> = { last_checked_at: new Date().toISOString() };
+      if (filingDate) { const d = toISO(filingDate); if (d) updateData.filing_date = d; }
+      if (regDate) { const d = toISO(regDate); if (d) updateData.registration_date = d; }
+      if (nextHearing) { const d = parseHCDate(nextHearing); if (d) updateData.next_hearing_date = d; }
+      if (stage) updateData.current_status = stage;
+      if (judge) updateData.judges = judge;
+      updateData.raw_data = { ...caseData.raw_data, sourceHtml: detailHtml, hcDetailFetched: true };
+
+      console.log("[Refresh HC] Parsed:", { filing: filingDate, reg: regDate, nextHearing, stage, judge });
+
+      await supabase.from("cases").update(updateData).eq("id", id);
+      return NextResponse.json({ success: true, updated: Object.keys(updateData).length });
+    } catch (hcErr) {
+      console.error("[Refresh HC] Failed:", hcErr);
+      await supabase.from("cases").update({ last_checked_at: new Date().toISOString() }).eq("id", id);
+      return NextResponse.json({ error: "HC detail fetch failed: " + (hcErr instanceof Error ? hcErr.message : "Unknown error") + ". Try again." }, { status: 502 });
+    }
   }
 
   let caseStatus = null;
