@@ -937,6 +937,9 @@ function parseHCResults(data: string): SearchResult[] {
     // Parse case type and number from case number string like "ARBAPPL/50/2022"
     const caseMatch = caseNo.match(/^([A-Za-z]+)\/?(\d+)\/?(\d{4})$/);
 
+    const caseId = fields[0] || "";
+    const token = fields.length > 7 ? fields[7] : "";
+
     results.push({
       caseTitle: petitioner && respondent ? `${petitioner} vs ${respondent}` : caseNo,
       caseNumber: caseMatch ? caseMatch[2] : caseNo,
@@ -947,7 +950,9 @@ function parseHCResults(data: string): SearchResult[] {
       cnrNumber: cnr || undefined,
       petitioner: petitioner || undefined,
       respondent: respondent || undefined,
-    });
+      // Store HC-specific fields for detail fetch
+      rawData: { hcCaseId: caseId, hcToken: token, hcStateCode: "" },
+    } as SearchResult);
   }
 
   return results;

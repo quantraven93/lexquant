@@ -60,6 +60,8 @@ export interface SearchResult {
   petitioner?: string;
   respondent?: string;
   nextHearingDate?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  rawData?: Record<string, any>;
 }
 
 export interface CourtApiProvider {
