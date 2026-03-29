@@ -41,18 +41,19 @@ async function preprocessCaptcha(imageBuffer: Buffer): Promise<Buffer> {
   const { width, height, channels } = info;
   const processed = Buffer.from(data);
 
-  // Remove gray interference lines (RGB ~0x70 ± tolerance)
+  // Remove gray interference lines (RGB ~0x70 ± small tolerance)
+  // Use tight tolerance to avoid removing dark gray text
   for (let i = 0; i < data.length; i += channels) {
     const r = data[i], g = data[i + 1], b = data[i + 2];
-    if (Math.abs(r - 0x70) < 15 && Math.abs(g - 0x70) < 15 && Math.abs(b - 0x70) < 15) {
+    if (Math.abs(r - 0x70) < 8 && Math.abs(g - 0x70) < 8 && Math.abs(b - 0x70) < 8) {
       processed[i] = 255; processed[i + 1] = 255; processed[i + 2] = 255; processed[i + 3] = 255;
     }
   }
 
-  // Threshold to binary
+  // Threshold to binary — use higher threshold to keep dark gray text
   for (let i = 0; i < processed.length; i += channels) {
     const gray = (processed[i] + processed[i + 1] + processed[i + 2]) / 3;
-    const val = gray < 100 ? 0 : 255;
+    const val = gray < 140 ? 0 : 255;
     processed[i] = val; processed[i + 1] = val; processed[i + 2] = val;
   }
 
