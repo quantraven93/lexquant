@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { DashboardShell } from "@/components/DashboardShell";
-import { COURT_TYPES, INDIAN_STATES } from "@/lib/utils";
+import { INDIAN_STATES } from "@/lib/utils";
+import { COURT_HIERARCHY, HIGH_COURTS, SC_CASE_TYPES, getDistricts } from "@/lib/court-data";
 
 interface SearchResult {
   caseTitle: string;
@@ -27,7 +28,9 @@ const YEARS = Array.from({ length: 30 }, (_, i) => String(new Date().getFullYear
 export default function SearchPage() {
   const [tab, setTab] = useState<SearchTab>("party");
   const [courtType, setCourtType] = useState("");
+  const [hcCode, setHcCode] = useState(""); // HC specific court code (state_cd)
   const [stateCode, setStateCode] = useState("");
+  const [district, setDistrict] = useState("");
   const [year, setYear] = useState("");
   // Party name fields
   const [partyName, setPartyName] = useState("");
@@ -124,8 +127,6 @@ export default function SearchPage() {
     { key: "cnr", label: "BY CNR" },
   ];
 
-  const showStateSelector = courtType === "HC" || courtType === "DC";
-
   return (
     <DashboardShell>
       <div style={{ display: "flex", flexDirection: "column", gap: "1px", background: "var(--bb-border)", minHeight: "100%" }}>
@@ -150,28 +151,60 @@ export default function SearchPage() {
 
           <div className="bb-panel-body" style={{ padding: "1rem" }}>
             <form onSubmit={handleSearch}>
-              {/* Court selector — all tabs */}
-              <div style={{ display: "grid", gridTemplateColumns: showStateSelector ? "1fr 1fr" : "1fr", gap: "0.5rem", marginBottom: "0.75rem" }}>
+              {/* Cascading court selector */}
+              <div style={{ display: "grid", gridTemplateColumns: courtType === "DC" ? "1fr 1fr 1fr" : courtType === "HC" ? "1fr 1fr" : "1fr", gap: "0.5rem", marginBottom: "0.75rem" }}>
                 <div>
                   <label style={{ display: "block", fontSize: "0.6rem", color: "var(--bb-gray)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.25rem", fontWeight: 600 }}>
-                    COURT
+                    HEARING COURT
                   </label>
-                  <select value={courtType} onChange={(e) => setCourtType(e.target.value)} style={{ width: "100%" }}>
+                  <select value={courtType} onChange={(e) => { setCourtType(e.target.value); setHcCode(""); setStateCode(""); setDistrict(""); }} style={{ width: "100%" }}>
                     <option value="">All Courts</option>
-                    {COURT_TYPES.map((ct) => (
+                    {COURT_HIERARCHY.map((ct) => (
                       <option key={ct.value} value={ct.value}>{ct.label}</option>
                     ))}
                   </select>
                 </div>
-                {showStateSelector && (
+
+                {/* HC: Show specific High Court selector */}
+                {courtType === "HC" && (
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.6rem", color: "var(--bb-gray)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.25rem", fontWeight: 600 }}>
+                      SELECT HIGH COURT
+                    </label>
+                    <select value={hcCode} onChange={(e) => { setHcCode(e.target.value); const hc = HIGH_COURTS.find(h => h.value === e.target.value); if (hc?.stateCode) setStateCode(hc.stateCode); }} style={{ width: "100%" }}>
+                      <option value="">All High Courts</option>
+                      {HIGH_COURTS.map((hc) => (
+                        <option key={hc.value + hc.stateCode} value={hc.value}>{hc.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* DC: Show State selector */}
+                {courtType === "DC" && (
                   <div>
                     <label style={{ display: "block", fontSize: "0.6rem", color: "var(--bb-gray)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.25rem", fontWeight: 600 }}>
                       STATE
                     </label>
-                    <select value={stateCode} onChange={(e) => setStateCode(e.target.value)} style={{ width: "100%" }}>
-                      <option value="">All States</option>
+                    <select value={stateCode} onChange={(e) => { setStateCode(e.target.value); setDistrict(""); }} style={{ width: "100%" }}>
+                      <option value="">Select State</option>
                       {INDIAN_STATES.map((s) => (
                         <option key={s.code} value={s.code}>{s.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* DC: Show District selector */}
+                {courtType === "DC" && stateCode && getDistricts(stateCode).length > 0 && (
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.6rem", color: "var(--bb-gray)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.25rem", fontWeight: 600 }}>
+                      DISTRICT
+                    </label>
+                    <select value={district} onChange={(e) => setDistrict(e.target.value)} style={{ width: "100%" }}>
+                      <option value="">All Districts</option>
+                      {getDistricts(stateCode).map((d) => (
+                        <option key={d.value} value={d.value}>{d.label}</option>
                       ))}
                     </select>
                   </div>
@@ -206,8 +239,17 @@ export default function SearchPage() {
                     <label style={{ display: "block", fontSize: "0.6rem", color: "var(--bb-gray)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.25rem", fontWeight: 600 }}>
                       CASE TYPE
                     </label>
-                    <input type="text" value={caseType} onChange={(e) => setCaseType(e.target.value)}
-                      placeholder="e.g. WP, SLP, CRL.A" style={{ width: "100%" }} />
+                    {courtType === "SC" ? (
+                      <select value={caseType} onChange={(e) => setCaseType(e.target.value)} style={{ width: "100%" }}>
+                        <option value="">Select Case Type</option>
+                        {SC_CASE_TYPES.map((ct) => (
+                          <option key={ct.value} value={ct.value}>{ct.label}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input type="text" value={caseType} onChange={(e) => setCaseType(e.target.value)}
+                        placeholder="e.g. WP, SLP, CRL.A" style={{ width: "100%" }} />
+                    )}
                   </div>
                   <div>
                     <label style={{ display: "block", fontSize: "0.6rem", color: "var(--bb-gray)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.25rem", fontWeight: 600 }}>
