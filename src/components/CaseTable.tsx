@@ -10,6 +10,7 @@ interface CaseRow {
   case_title: string;
   court_type: string;
   court_name: string | null;
+  case_type: string | null;
   case_number: string;
   case_year: string | null;
   current_status: string | null;
@@ -123,7 +124,7 @@ export function CaseTable({ cases }: { cases: CaseRow[] }) {
                         {c.case_title || `${c.case_number}/${c.case_year}`}
                       </p>
                       <p style={{ fontSize: '0.62rem', color: 'var(--bb-gray)', marginTop: '1px' }}>
-                        {c.case_number}{c.case_year ? `/${c.case_year}` : ""}
+                        {c.case_type ? `${c.case_type} ` : ""}{c.case_number}{c.case_year ? `/${c.case_year}` : ""}
                       </p>
                     </div>
                   </td>
