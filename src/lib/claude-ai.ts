@@ -1,7 +1,7 @@
 /**
  * Claude AI — CAPTCHA solver & AI utilities
  *
- * Uses Anthropic Claude (claude-sonnet-4-20250514) for:
+ * Uses Anthropic Claude (claude-haiku-4-5-20251001) for:
  * 1. Solving math CAPTCHAs from court websites (SC + eCourts) via vision
  * 2. Summarizing court orders/judgments
  * 3. Generating case summaries
@@ -107,7 +107,7 @@ export async function summarizeOrder(
   try {
     const client = getClient();
     const response = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-haiku-4-5-20251001",
       max_tokens: 200,
       messages: [
         {
@@ -185,7 +185,7 @@ export async function summarizeCase(caseData: {
         : "";
 
     const response = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-haiku-4-5-20251001",
       max_tokens: 300,
       messages: [
         {

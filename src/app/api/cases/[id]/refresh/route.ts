@@ -132,8 +132,14 @@ export async function POST(
       const regDate = detailHtml.match(/Registration Date.*?:\s*(\d{2}-\d{2}-\d{4})/i)?.[1] || "";
       const nextHearing = detailHtml.match(/Next Hearing Date.*?:\s*([^<]+)/i)?.[1]?.trim() || "";
       const stage = detailHtml.match(/Stage of Case.*?:\s*([^<]+)/i)?.[1]?.trim() || "";
-      const judgeMatch = detailHtml.match(/Judge.*?<\/t[dh]>\s*<t[dh][^>]*>(.*?)<\/t[dh]>/i);
-      const judge = judgeMatch ? stripTags(judgeMatch[1]).split(",")[0]?.trim() : "";
+      // Find judge from hearing history — look for actual judge name, not column headers
+      const judgeMatch = detailHtml.match(/CAUSE LIST.*?:\s*([A-Z][A-Z\s.]+(?:RAO|REDDY|KUMAR|MISHRA|BHATTI|SHARMA|SINGH|GUPTA|NAIDU|PRASAD|MURTHY|JHA|IYER|NAIR|MENON|PILLAI|DAS|ROY|PATEL|KHAN|ALI|JAIN|AGARWAL|MITHAL|HEGDE|GOWDA|SWAMY|BABU|CHARY|VARMA|VERMA|SAXENA|TYAGI|YADAV|CHAUHAN|THAKUR|RATHORE|MEHTA)[A-Z\s.]*)/i);
+      let judge = judgeMatch ? judgeMatch[1].trim() : "";
+      // Fallback: look for "Judge" in table data (not headers)
+      if (!judge) {
+        const judgeData = detailHtml.match(/<td[^>]*class="[^"]*"[^>]*>\s*([A-Z][A-Z\s.]{5,50}(?:RAO|REDDY|KUMAR|JHA|SHARMA|SINGH|BHATTI|MISHRA))\s*<\/td>/i);
+        if (judgeData) judge = judgeData[1].trim();
+      }
 
       // Convert DD-MM-YYYY to YYYY-MM-DD
       function toISO(d: string): string | null {
