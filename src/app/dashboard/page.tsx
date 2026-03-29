@@ -10,6 +10,7 @@ interface CaseData {
   case_title: string;
   court_type: string;
   court_name: string | null;
+  case_type: string | null;
   case_number: string;
   case_year: string | null;
   current_status: string | null;
