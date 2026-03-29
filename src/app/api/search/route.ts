@@ -18,6 +18,9 @@ export async function GET(request: Request) {
   const year = searchParams.get("year");
   const searchType = searchParams.get("type") || "party";
   const caseType = searchParams.get("case_type");
+  const district = searchParams.get("district");
+  const courtComplex = searchParams.get("court_complex");
+  const hcCode = searchParams.get("hc_code");
 
   if (!query || query.length < 1) {
     return NextResponse.json({ error: "Query required" }, { status: 400 });
@@ -37,16 +40,23 @@ export async function GET(request: Request) {
       }
 
       case "case_number": {
-        // For case number search, try to look up the case directly
         const identifier = {
           courtType: (courtType || "DC") as CourtType,
           caseType: caseType || "",
           caseNumber: query,
           caseYear: year || "",
           stateCode: stateCode || undefined,
+          districtCode: district || undefined,
+          courtCode: courtComplex?.split("@")[0] || undefined,
         };
         console.log("[Search] Case number lookup:", identifier);
         const caseStatus = await courtService.getCaseStatus(identifier);
+
+        // Determine court name from params
+        let courtName = "District Court";
+        if (courtType === "SC") courtName = "Supreme Court of India";
+        else if (courtType === "HC") courtName = "High Court";
+
         if (caseStatus) {
           return NextResponse.json({
             results: [{
@@ -55,10 +65,11 @@ export async function GET(request: Request) {
               caseYear: year || "",
               caseType: caseType || "",
               courtType: courtType || "DC",
-              courtName: courtType === "SC" ? "Supreme Court" : courtType === "HC" ? "High Court" : "District Court",
+              courtName,
               status: caseStatus.currentStatus,
               petitioner: caseStatus.petitioner,
               respondent: caseStatus.respondent,
+              cnrNumber: caseStatus.rawData?.cnrNumber,
             }],
           });
         }

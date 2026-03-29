@@ -105,6 +105,7 @@ export default function SearchPage() {
     if (stateCode) params.set("state_code", stateCode);
     if (hcCode) params.set("hc_code", hcCode);
     if (district) params.set("district", district);
+    if (courtComplex) params.set("court_complex", courtComplex);
     if (year) params.set("year", year);
 
     switch (tab) {
@@ -153,11 +154,13 @@ export default function SearchPage() {
           caseYear: result.caseYear,
           courtCode: result.courtCode,
           cnrNumber: result.cnrNumber,
-          courtName: result.courtName,
+          courtName: result.courtName || (courtComplex ? complexes.find(c => c.value === courtComplex)?.label : undefined),
           caseTitle: result.caseTitle,
           petitioner: result.petitioner,
           respondent: result.respondent,
           status: result.status,
+          stateCode: stateCode || undefined,
+          districtCode: district || undefined,
         }),
       });
       if (res.ok) {
