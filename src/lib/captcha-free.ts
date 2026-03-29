@@ -1,39 +1,38 @@
 /**
- * Free CAPTCHA solver using Sharp + Tesseract.js
+ * Free CAPTCHA solver using Sharp + system Tesseract binary
  *
  * Ported from openjustice-in/ecourts Python approach:
  * 1. Remove gray interference lines (color ~0x707070)
  * 2. Threshold to binary
  * 3. Crop to text region
- * 4. OCR with Tesseract.js (LSTM engine)
+ * 4. OCR with system `tesseract` binary via child_process
  *
  * Cost: $0. No API calls.
- * Accuracy: ~70-80% per attempt. Retry up to 5 times.
- *
- * Falls back to Claude Haiku Vision if all attempts fail.
+ * Requires: `brew install tesseract` (or apt-get install tesseract-ocr)
  */
 
 import sharp from "sharp";
+import { execFileSync } from "child_process";
+import { writeFileSync, unlinkSync, readFileSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
 
-let tesseractWorker: import("tesseract.js").Worker | null = null;
-
-async function getWorker() {
-  if (tesseractWorker) return tesseractWorker;
-  const Tesseract = await import("tesseract.js");
-  tesseractWorker = await Tesseract.createWorker("eng");
-  await tesseractWorker.setParameters({
-    tessedit_char_whitelist: "abcdefghijklmnopqrstuvwxyz0123456789",
-    tessedit_pageseg_mode: "8" as unknown as import("tesseract.js").PSM, // Single word
-  });
-  return tesseractWorker;
+/**
+ * Check if system tesseract is available
+ */
+function hasTesseract(): boolean {
+  try {
+    execFileSync("tesseract", ["--version"], { stdio: "pipe" });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
  * Preprocess eCourts CAPTCHA image using Sharp.
- * Removes interference lines, thresholds, and crops.
  */
 async function preprocessCaptcha(imageBuffer: Buffer): Promise<Buffer> {
-  // Get raw pixel data
   const { data, info } = await sharp(imageBuffer)
     .ensureAlpha()
     .raw()
@@ -42,80 +41,77 @@ async function preprocessCaptcha(imageBuffer: Buffer): Promise<Buffer> {
   const { width, height, channels } = info;
   const processed = Buffer.from(data);
 
-  // Step 1: Remove gray interference lines (RGB ~0x70,0x70,0x70 ± tolerance)
-  const LINE_COLOR = 0x70;
-  const TOLERANCE = 15;
+  // Remove gray interference lines (RGB ~0x70 ± tolerance)
   for (let i = 0; i < data.length; i += channels) {
-    const r = data[i];
-    const g = data[i + 1];
-    const b = data[i + 2];
-
-    if (
-      Math.abs(r - LINE_COLOR) < TOLERANCE &&
-      Math.abs(g - LINE_COLOR) < TOLERANCE &&
-      Math.abs(b - LINE_COLOR) < TOLERANCE
-    ) {
-      // Replace line pixels with white
-      processed[i] = 255;
-      processed[i + 1] = 255;
-      processed[i + 2] = 255;
-      processed[i + 3] = 255;
+    const r = data[i], g = data[i + 1], b = data[i + 2];
+    if (Math.abs(r - 0x70) < 15 && Math.abs(g - 0x70) < 15 && Math.abs(b - 0x70) < 15) {
+      processed[i] = 255; processed[i + 1] = 255; processed[i + 2] = 255; processed[i + 3] = 255;
     }
   }
 
-  // Step 2: Threshold to binary (dark text = black, rest = white)
-  const THRESHOLD = 100;
+  // Threshold to binary
   for (let i = 0; i < processed.length; i += channels) {
     const gray = (processed[i] + processed[i + 1] + processed[i + 2]) / 3;
-    const val = gray < THRESHOLD ? 0 : 255;
-    processed[i] = val;
-    processed[i + 1] = val;
-    processed[i + 2] = val;
+    const val = gray < 100 ? 0 : 255;
+    processed[i] = val; processed[i + 1] = val; processed[i + 2] = val;
   }
 
-  // Step 3: Convert back to PNG, crop to text region, and resize for better OCR
-  const result = await sharp(processed, { raw: { width, height, channels } })
+  return sharp(processed, { raw: { width, height, channels } })
     .extract({
       left: Math.min(27, width - 1),
       top: Math.min(15, height - 1),
       width: Math.min(163, width - 27),
       height: Math.min(50, height - 15),
     })
-    .resize({ width: 326, height: 100, fit: "fill" }) // 2x upscale for better OCR
+    .resize({ width: 326, height: 100, fit: "fill" })
     .sharpen()
     .png()
     .toBuffer();
-
-  return result;
 }
 
 /**
- * Solve eCourts text CAPTCHA for free using image processing + Tesseract.
- * Returns the CAPTCHA text (5 lowercase alphanumeric chars) or null.
+ * Run system tesseract on an image buffer and return the text.
  */
-export async function solveCaptchaFree(
-  imageBuffer: Buffer
-): Promise<string | null> {
+function runTesseract(imageBuffer: Buffer, whitelist: string): string {
+  const inputPath = join(tmpdir(), `captcha-${Date.now()}.png`);
+  const outputBase = join(tmpdir(), `captcha-out-${Date.now()}`);
+
+  try {
+    writeFileSync(inputPath, imageBuffer);
+    execFileSync("tesseract", [
+      inputPath, outputBase,
+      "--oem", "1",
+      "--psm", "8",
+      "-c", `tessedit_char_whitelist=${whitelist}`,
+    ], { stdio: "pipe", timeout: 10000 });
+
+    const result = readFileSync(`${outputBase}.txt`, "utf-8").trim();
+    return result;
+  } finally {
+    try { unlinkSync(inputPath); } catch {}
+    try { unlinkSync(`${outputBase}.txt`); } catch {}
+  }
+}
+
+/**
+ * Solve eCourts text CAPTCHA for free.
+ * Returns 5 lowercase alphanumeric chars or null.
+ */
+export async function solveCaptchaFree(imageBuffer: Buffer): Promise<string | null> {
+  if (!hasTesseract()) return null;
+
   try {
     const processed = await preprocessCaptcha(imageBuffer);
-    const worker = await getWorker();
-    const { data: { text } } = await worker.recognize(processed);
+    const raw = runTesseract(processed, "abcdefghijklmnopqrstuvwxyz0123456789");
+    const cleaned = raw.toLowerCase().replace(/[^a-z0-9]/g, "");
 
-    const cleaned = text.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
-
-    if (cleaned.length === 5) {
-      console.log(`[Free CAPTCHA] Solved: "${cleaned}"`);
-      return cleaned;
-    }
-
-    // Try without strict 5-char validation if close
     if (cleaned.length >= 4 && cleaned.length <= 6) {
       const result = cleaned.substring(0, 5);
-      console.log(`[Free CAPTCHA] Partial: "${text.trim()}" → "${result}" (${cleaned.length} chars)`);
+      console.log(`[Free CAPTCHA] Solved: "${raw}" → "${result}"`);
       return result;
     }
 
-    console.warn(`[Free CAPTCHA] Failed: got "${text.trim()}" → "${cleaned}" (${cleaned.length} chars)`);
+    console.warn(`[Free CAPTCHA] Failed: "${raw}" → "${cleaned}" (${cleaned.length} chars)`);
     return null;
   } catch (error) {
     console.error("[Free CAPTCHA] Error:", error);
@@ -125,14 +121,12 @@ export async function solveCaptchaFree(
 
 /**
  * Solve SC math CAPTCHA for free.
- * SC CAPTCHAs show simple math like "6 + 4" or "9 - 3".
- * Sharp can clean the image, Tesseract reads digits and operator.
+ * SC shows "6 + 4" or "9 - 3" — OCR reads digits and operator.
  */
-export async function solveMathCaptchaFree(
-  imageBuffer: Buffer
-): Promise<string | null> {
+export async function solveMathCaptchaFree(imageBuffer: Buffer): Promise<string | null> {
+  if (!hasTesseract()) return null;
+
   try {
-    // Simpler preprocessing for math CAPTCHAs (cleaner images)
     const processed = await sharp(imageBuffer)
       .greyscale()
       .threshold(128)
@@ -141,26 +135,9 @@ export async function solveMathCaptchaFree(
       .png()
       .toBuffer();
 
-    const worker = await getWorker();
-    // Temporarily change whitelist for math
-    await worker.setParameters({
-      tessedit_char_whitelist: "0123456789+-= ",
-      tessedit_pageseg_mode: "7" as unknown as import("tesseract.js").PSM, // Single line
-    });
+    const raw = runTesseract(processed, "0123456789+- ");
+    const mathMatch = raw.match(/(\d+)\s*([+-])\s*(\d+)/);
 
-    const { data: { text } } = await worker.recognize(processed);
-
-    // Restore original whitelist
-    await worker.setParameters({
-      tessedit_char_whitelist: "abcdefghijklmnopqrstuvwxyz0123456789",
-      tessedit_pageseg_mode: "8" as unknown as import("tesseract.js").PSM,
-    });
-
-    const cleaned = text.trim();
-    console.log(`[Free CAPTCHA] Math OCR: "${cleaned}"`);
-
-    // Try to evaluate the math expression
-    const mathMatch = cleaned.match(/(\d+)\s*([+-])\s*(\d+)/);
     if (mathMatch) {
       const a = parseInt(mathMatch[1]);
       const op = mathMatch[2];
@@ -170,6 +147,7 @@ export async function solveMathCaptchaFree(
       return String(result);
     }
 
+    console.warn(`[Free CAPTCHA] Math failed: "${raw}"`);
     return null;
   } catch (error) {
     console.error("[Free CAPTCHA] Math error:", error);
