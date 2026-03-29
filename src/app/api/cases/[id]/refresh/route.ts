@@ -45,6 +45,15 @@ export async function POST(
 
   console.log("[Refresh] Fetching case status:", JSON.stringify(identifier));
 
+  // HC cases: the getCaseStatus scraper uses wrong endpoints for HC
+  // HC detail fetch needs its own scraper (cases/o_civil_case_history.php)
+  // For now, skip scraping and return existing data
+  if (caseData.court_type === "HC") {
+    // Update last_checked_at
+    await supabase.from("cases").update({ last_checked_at: new Date().toISOString() }).eq("id", id);
+    return NextResponse.json({ success: true, updated: 1, note: "HC detail scraper not yet implemented. Case data preserved from search." });
+  }
+
   let caseStatus = null;
   try {
     caseStatus = await courtService.getCaseStatus(identifier);

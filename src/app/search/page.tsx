@@ -46,6 +46,7 @@ export default function SearchPage() {
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [trackingId, setTrackingId] = useState<string | null>(null);
+  const [trackedCases, setTrackedCases] = useState<Set<string>>(new Set());
   const router = useRouter();
 
   async function handleSearch(e: React.FormEvent) {
@@ -113,8 +114,8 @@ export default function SearchPage() {
         }),
       });
       if (res.ok) {
-        const data = await res.json();
-        router.push(`/case/${data.case.id}`);
+        // Stay on search page — mark this result as tracked
+        setTrackedCases(prev => new Set([...prev, result.caseNumber + result.caseYear]));
       }
     } catch { /* ignore */ }
     setTrackingId(null);
@@ -367,7 +368,12 @@ export default function SearchPage() {
                             </span>
                           </td>
                           <td style={{ textAlign: "right" }}>
-                            <button
+                            {trackedCases.has(r.caseNumber + r.caseYear) ? (
+                          <span style={{ fontSize: "0.6rem", color: "var(--bb-green)", fontWeight: 600, letterSpacing: "0.05em" }}>
+                            TRACKED ✓
+                          </span>
+                        ) : (
+                          <button
                               onClick={() => trackCase(r)}
                               disabled={trackingId === r.caseNumber + r.caseYear}
                               className="bb-btn bb-btn-primary"
@@ -375,6 +381,7 @@ export default function SearchPage() {
                             >
                               {trackingId === r.caseNumber + r.caseYear ? "[...]" : "[+ TRACK]"}
                             </button>
+                        )}
                           </td>
                         </tr>
                       ))}
