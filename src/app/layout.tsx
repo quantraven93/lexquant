@@ -1,16 +1,29 @@
 import type { Metadata } from "next";
-import { Fira_Code } from "next/font/google";
+import { IBM_Plex_Mono, IBM_Plex_Sans, IBM_Plex_Serif } from "next/font/google";
 import "./globals.css";
 
-const firaCode = Fira_Code({
+const plexMono = IBM_Plex_Mono({
   variable: "--font-mono",
   subsets: ["latin"],
+  weight: ["400", "500", "600"],
+});
+
+const plexSans = IBM_Plex_Sans({
+  variable: "--font-sans",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+});
+
+const plexSerif = IBM_Plex_Serif({
+  variable: "--font-serif",
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
 });
 
 export const metadata: Metadata = {
-  title: "LexQuant - Indian Court Case Intelligence Terminal",
+  title: "LexQuant — Bloomberg Terminal for Indian Legal Practice",
   description:
-    "Bloomberg-style terminal for tracking cases across Supreme Court, High Courts, and District Courts of India",
+    "Live judgments, hearings, and matter tracking across the Supreme Court, High Courts, and District Courts of India.",
 };
 
 export default function RootLayout({
@@ -20,7 +33,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${firaCode.variable} antialiased`}>
+      <body
+        className={`${plexMono.variable} ${plexSans.variable} ${plexSerif.variable} antialiased`}
+      >
         {children}
       </body>
     </html>
