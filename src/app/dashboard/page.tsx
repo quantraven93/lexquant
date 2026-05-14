@@ -5,6 +5,7 @@ import { DashboardShell } from "@/components/DashboardShell";
 import { StatsCards } from "@/components/StatsCards";
 import { CaseTable } from "@/components/CaseTable";
 import { LiveDigest } from "@/components/LiveDigest";
+import { WatchlistPanel } from "@/components/WatchlistPanel";
 
 interface CaseData {
   id: string;
@@ -119,6 +120,9 @@ export default function DashboardPage() {
             </div>
             <div style={{ background: "var(--bb-panel)" }}>
               <LiveDigest limit={10} />
+            </div>
+            <div style={{ background: "var(--bb-panel)" }}>
+              <WatchlistPanel />
             </div>
             <div style={{ background: "var(--bb-panel)" }}>
               <CaseTable cases={cases} />
