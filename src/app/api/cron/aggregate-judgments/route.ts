@@ -12,6 +12,7 @@ import {
   fetchJudgmentsForAllCourts,
   type IKCourtCode,
 } from "@/lib/courts/ik-judgments";
+import { ingestNews } from "@/lib/news/ingest";
 
 export const maxDuration = 60;
 
@@ -95,8 +96,18 @@ export async function GET(request: Request) {
   }
 
   try {
-    const result = await ingestJudgments();
-    return NextResponse.json(result);
+    const judgments = await ingestJudgments();
+    // News ingest runs in the same cron to stay within Hobby tier's
+    // 2-cron cap. Failures here are logged but do not abort the run.
+    let news: Awaited<ReturnType<typeof ingestNews>> | { error: string };
+    try {
+      news = await ingestNews();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error("[News] Ingest failed inside judgments cron:", msg);
+      news = { error: msg };
+    }
+    return NextResponse.json({ judgments, news });
   } catch (err) {
     console.error("[Judgments] Fatal:", err);
     return NextResponse.json(
