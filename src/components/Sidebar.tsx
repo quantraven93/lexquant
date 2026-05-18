@@ -11,6 +11,7 @@ import {
   PlusCircle,
   LogOut,
   Sparkles,
+  Globe2,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -20,6 +21,7 @@ const navItems = [
   { href: "/briefing", label: "Briefing", icon: Sparkles },
   { href: "/search", label: "Search", icon: Search },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
+  { href: "/us-opinions", label: "US Opinions", icon: Globe2 },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
