@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { SOURCE_BADGES } from "@/lib/news/sources";
 
 interface Judgment {
@@ -46,12 +47,30 @@ const COURT_BADGES: Record<string, string> = {
 
 const ROW_STYLE: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "60px 1fr auto",
+  gridTemplateColumns: "60px 1fr auto auto",
   gap: "0.5rem",
   alignItems: "baseline",
   padding: "0.4rem 0.75rem",
   borderBottom: "1px solid rgba(0,0,0,0.05)",
   fontSize: "0.72rem",
+};
+
+const NEWS_ROW_STYLE: React.CSSProperties = {
+  ...ROW_STYLE,
+  gridTemplateColumns: "60px 1fr auto",
+};
+
+const RESEARCH_LINK_STYLE: React.CSSProperties = {
+  fontFamily: "var(--bb-font, monospace)",
+  fontSize: "0.58rem",
+  letterSpacing: "0.1em",
+  textTransform: "uppercase",
+  color: "var(--bb-amber)",
+  textDecoration: "none",
+  padding: "0.15rem 0.45rem",
+  border: "1px solid var(--bb-amber-dim)",
+  borderRadius: "2px",
+  whiteSpace: "nowrap",
 };
 
 const BADGE_STYLE: React.CSSProperties = {
@@ -209,6 +228,13 @@ export function LiveDigest({ limit = 10 }: { limit?: number }) {
                     </span>
                   ) : null}
                 </a>
+                <Link
+                  href={`/research/${j.ik_tid}`}
+                  style={RESEARCH_LINK_STYLE}
+                  title="Open structured research view"
+                >
+                  Research
+                </Link>
                 <span style={DATE_STYLE}>
                   {j.publish_date
                     ? new Date(j.publish_date).toLocaleDateString("en-IN", {
@@ -230,7 +256,7 @@ export function LiveDigest({ limit = 10 }: { limit?: number }) {
         ) : (
           <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
             {news.map((n) => (
-              <li key={n.id} style={ROW_STYLE}>
+              <li key={n.id} style={NEWS_ROW_STYLE}>
                 <span style={BADGE_STYLE}>
                   {SOURCE_BADGES[n.source] ||
                     n.source.slice(0, 4).toUpperCase()}
