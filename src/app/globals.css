@@ -471,3 +471,177 @@ select option {
     grid-template-columns: 1fr !important;
   }
 }
+
+/* ============================================
+   App Shell (Pass 1) — 4-zone grid
+   ============================================ */
+
+.app-shell {
+  display: grid;
+  grid-template-rows: 28px 40px 1fr 22px;
+  grid-template-columns: 220px 1fr;
+  height: 100vh;
+  background: var(--bb-bg);
+  overflow: hidden;
+}
+
+.bb-menubar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0 0.85rem;
+  background: var(--bb-panel-header);
+  border-bottom: 1px solid var(--bb-border);
+  font-family: var(--bb-font);
+  font-size: 0.62rem;
+  overflow: hidden;
+}
+
+.bb-menubar-brand {
+  color: var(--bb-amber);
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-decoration: none;
+  font-size: 0.7rem;
+}
+
+.bb-menubar-divider {
+  width: 1px;
+  height: 14px;
+  background: var(--bb-border);
+}
+
+.bb-menubar-chips {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  overflow-x: auto;
+}
+
+.bb-menubar-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.bb-menubar-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.1rem 0.55rem;
+  white-space: nowrap;
+  border-right: 1px solid var(--bb-border);
+}
+
+.bb-menubar-chip-label {
+  color: var(--bb-amber-dim);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.bb-menubar-chip-val {
+  color: var(--bb-white);
+  font-weight: 500;
+}
+
+.bb-topbar {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 220px 1fr 220px;
+  align-items: center;
+  background: var(--bb-panel);
+  border-bottom: 1px solid var(--bb-border);
+  padding: 0 0.85rem;
+  font-family: var(--bb-font);
+  font-size: 0.66rem;
+}
+
+.bb-topbar-crumbs {
+  color: var(--bb-gray);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.bb-topbar-search-slot {
+  display: flex;
+  justify-content: center;
+}
+
+.bb-topbar-search-stub {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  width: 100%;
+  max-width: 720px;
+  padding: 0.3rem 0.7rem;
+  background: #ffffff;
+  border: 1px solid var(--bb-border);
+  color: var(--bb-gray);
+  font-family: var(--bb-font);
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+}
+
+.bb-topbar-actions {
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.bb-sidebar-zone {
+  grid-column: 1;
+  grid-row: 3;
+  background: var(--bb-bg);
+  border-right: 1px solid var(--bb-border);
+  overflow-y: auto;
+}
+
+.bb-sidebar-zone > aside {
+  width: 100%;
+}
+
+.bb-main-zone {
+  grid-column: 2;
+  grid-row: 3;
+  background: var(--bb-bg);
+  overflow: auto;
+  padding: 0;
+}
+
+.bb-statusbar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: var(--bb-panel-header);
+  border-top: 1px solid var(--bb-border);
+  padding: 0 0.6rem;
+  font-family: var(--bb-font);
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.bb-status-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0 0.7rem;
+  height: 22px;
+  border-right: 1px solid var(--bb-border);
+  white-space: nowrap;
+}
+
+.bb-status-cell:last-child {
+  border-right: none;
+}
+
+.bb-status-label {
+  color: var(--bb-gray);
+  font-weight: 600;
+}
+
+.bb-status-val {
+  color: var(--bb-amber-dim);
+  font-weight: 600;
+}
