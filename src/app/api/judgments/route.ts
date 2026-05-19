@@ -15,7 +15,7 @@ export async function GET(request: Request) {
   let query = supabase
     .from("judgments")
     .select(
-      "id, ik_tid, court_code, court_name, title, citation, publish_date, author, headline, source_url, ingested_at",
+      "id, ik_tid, court_code, court_name, title, citation, publish_date, author, headline, source_url, ingested_at, cited_by_tids",
     )
     .order("publish_date", { ascending: false, nullsFirst: false })
     .limit(limit);
