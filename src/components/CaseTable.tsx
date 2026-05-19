@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import { format, differenceInDays } from "date-fns";
 import { cn, COURT_TYPE_COLORS, STATUS_COLORS } from "@/lib/utils";
+import { useCaseHover, type HoverCaseData } from "./CaseHoverPreview";
 
 interface CaseRow {
   id: string;
@@ -16,18 +17,41 @@ interface CaseRow {
   current_status: string | null;
   next_hearing_date: string | null;
   last_order_date: string | null;
+  last_order_summary?: string | null;
+  judges?: string | null;
   petitioner: string | null;
   respondent: string | null;
   tags: string[];
 }
 
+function rowToHover(c: CaseRow): HoverCaseData {
+  return {
+    id: c.id,
+    case_title: c.case_title,
+    case_type: c.case_type,
+    case_number: c.case_number,
+    case_year: c.case_year,
+    court_type: c.court_type,
+    court_name: c.court_name,
+    current_status: c.current_status,
+    next_hearing_date: c.next_hearing_date,
+    petitioner: c.petitioner,
+    respondent: c.respondent,
+    judges: c.judges ?? null,
+    last_order_summary: c.last_order_summary ?? null,
+    tags: c.tags ?? null,
+  };
+}
+
 export function CaseTable({ cases }: { cases: CaseRow[] }) {
   const [filter, setFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
+  const { rowProps, preview } = useCaseHover();
 
   const filtered = useMemo(() => {
     let result = cases;
-    if (filter !== "all") result = result.filter((c) => c.court_type === filter);
+    if (filter !== "all")
+      result = result.filter((c) => c.court_type === filter);
     if (search) {
       const q = search.toLowerCase();
       result = result.filter(
@@ -35,7 +59,7 @@ export function CaseTable({ cases }: { cases: CaseRow[] }) {
           c.case_title?.toLowerCase().includes(q) ||
           c.case_number?.includes(q) ||
           c.petitioner?.toLowerCase().includes(q) ||
-          c.respondent?.toLowerCase().includes(q)
+          c.respondent?.toLowerCase().includes(q),
       );
     }
     return result;
@@ -53,22 +77,28 @@ export function CaseTable({ cases }: { cases: CaseRow[] }) {
   function getHearingStyle(dateStr: string | null) {
     if (!dateStr) return {};
     const days = differenceInDays(new Date(dateStr), new Date());
-    if (days < 0) return { color: 'var(--bb-red)' };
-    if (days <= 7) return { color: 'var(--bb-amber)' };
-    return { color: 'var(--bb-white)' };
+    if (days < 0) return { color: "var(--bb-red)" };
+    if (days <= 7) return { color: "var(--bb-amber)" };
+    return { color: "var(--bb-white)" };
   }
 
   return (
     <div className="bb-panel">
       <div className="bb-panel-header">
         <span className="bb-panel-title">Case Monitor</span>
-        <span className="text-muted" style={{ fontSize: '0.6rem' }}>
+        <span className="text-muted" style={{ fontSize: "0.6rem" }}>
           {filtered.length} CASES
         </span>
       </div>
 
-      <div className="flex items-center justify-between" style={{ background: 'var(--bb-panel-header)', borderBottom: '1px solid var(--bb-border)' }}>
-        <div className="bb-tabs" style={{ borderBottom: 'none', flex: 1 }}>
+      <div
+        className="flex items-center justify-between"
+        style={{
+          background: "var(--bb-panel-header)",
+          borderBottom: "1px solid var(--bb-border)",
+        }}
+      >
+        <div className="bb-tabs" style={{ borderBottom: "none", flex: 1 }}>
           {courtTabs.map((tab) => (
             <button
               key={tab.key}
@@ -86,19 +116,19 @@ export function CaseTable({ cases }: { cases: CaseRow[] }) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             style={{
-              fontSize: '0.65rem',
-              padding: '0.25rem 0.5rem',
-              width: '140px',
-              letterSpacing: '0.05em',
-              textTransform: 'uppercase',
+              fontSize: "0.65rem",
+              padding: "0.25rem 0.5rem",
+              width: "140px",
+              letterSpacing: "0.05em",
+              textTransform: "uppercase",
             }}
           />
         </div>
       </div>
 
       {filtered.length === 0 ? (
-        <div className="p-8 text-center" style={{ color: 'var(--bb-gray)' }}>
-          <p style={{ fontSize: '0.8rem', letterSpacing: '0.05em' }}>
+        <div className="p-8 text-center" style={{ color: "var(--bb-gray)" }}>
+          <p style={{ fontSize: "0.8rem", letterSpacing: "0.05em" }}>
             {cases.length === 0 ? "NO CASES TRACKED" : "NO RESULTS"}
           </p>
         </div>
@@ -112,19 +142,34 @@ export function CaseTable({ cases }: { cases: CaseRow[] }) {
                 <th>Status</th>
                 <th>Next Hearing</th>
                 <th>Tags</th>
-                <th style={{ width: '30px' }}></th>
+                <th style={{ width: "30px" }}></th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((c) => (
-                <tr key={c.id}>
+                <tr key={c.id} {...rowProps(rowToHover(c))}>
                   <td>
-                    <div style={{ maxWidth: '280px' }}>
-                      <p style={{ fontSize: '0.78rem', fontWeight: 500, color: 'var(--bb-white)' }} className="truncate">
+                    <div style={{ maxWidth: "280px" }}>
+                      <p
+                        style={{
+                          fontSize: "0.78rem",
+                          fontWeight: 500,
+                          color: "var(--bb-white)",
+                        }}
+                        className="truncate"
+                      >
                         {c.case_title || `${c.case_number}/${c.case_year}`}
                       </p>
-                      <p style={{ fontSize: '0.62rem', color: 'var(--bb-gray)', marginTop: '1px' }}>
-                        {c.case_type ? `${c.case_type} ` : ""}{c.case_number}{c.case_year ? `/${c.case_year}` : ""}
+                      <p
+                        style={{
+                          fontSize: "0.62rem",
+                          color: "var(--bb-gray)",
+                          marginTop: "1px",
+                        }}
+                      >
+                        {c.case_type ? `${c.case_type} ` : ""}
+                        {c.case_number}
+                        {c.case_year ? `/${c.case_year}` : ""}
                       </p>
                     </div>
                   </td>
@@ -132,9 +177,10 @@ export function CaseTable({ cases }: { cases: CaseRow[] }) {
                     <span
                       className={cn(
                         "inline-flex px-1.5 py-0.5 text-xs font-semibold",
-                        COURT_TYPE_COLORS[c.court_type] || "bg-gray-800/50 text-gray-500"
+                        COURT_TYPE_COLORS[c.court_type] ||
+                          "bg-gray-800/50 text-gray-500",
                       )}
-                      style={{ fontSize: '0.6rem', letterSpacing: '0.04em' }}
+                      style={{ fontSize: "0.6rem", letterSpacing: "0.04em" }}
                     >
                       {c.court_type}
                     </span>
@@ -144,14 +190,19 @@ export function CaseTable({ cases }: { cases: CaseRow[] }) {
                       className={cn(
                         "inline-flex px-1.5 py-0.5 text-xs font-semibold",
                         STATUS_COLORS[c.current_status || "Unknown"] ||
-                          "bg-gray-800/50 text-gray-500"
+                          "bg-gray-800/50 text-gray-500",
                       )}
-                      style={{ fontSize: '0.6rem', letterSpacing: '0.04em' }}
+                      style={{ fontSize: "0.6rem", letterSpacing: "0.04em" }}
                     >
                       {c.current_status || "Unknown"}
                     </span>
                   </td>
-                  <td style={{ ...getHearingStyle(c.next_hearing_date), fontSize: '0.75rem' }}>
+                  <td
+                    style={{
+                      ...getHearingStyle(c.next_hearing_date),
+                      fontSize: "0.75rem",
+                    }}
+                  >
                     {c.next_hearing_date
                       ? format(new Date(c.next_hearing_date), "dd MMM yyyy")
                       : "-"}
@@ -162,11 +213,11 @@ export function CaseTable({ cases }: { cases: CaseRow[] }) {
                         <span
                           key={tag}
                           style={{
-                            fontSize: '0.55rem',
-                            padding: '0.1rem 0.3rem',
-                            border: '1px solid var(--bb-border)',
-                            color: 'var(--bb-gray)',
-                            letterSpacing: '0.03em',
+                            fontSize: "0.55rem",
+                            padding: "0.1rem 0.3rem",
+                            border: "1px solid var(--bb-border)",
+                            color: "var(--bb-gray)",
+                            letterSpacing: "0.03em",
                           }}
                         >
                           {tag}
@@ -177,7 +228,11 @@ export function CaseTable({ cases }: { cases: CaseRow[] }) {
                   <td>
                     <Link
                       href={`/case/${c.id}`}
-                      style={{ color: 'var(--bb-amber)', fontSize: '0.8rem', fontWeight: 700 }}
+                      style={{
+                        color: "var(--bb-amber)",
+                        fontSize: "0.8rem",
+                        fontWeight: 700,
+                      }}
                     >
                       &gt;
                     </Link>
@@ -188,6 +243,7 @@ export function CaseTable({ cases }: { cases: CaseRow[] }) {
           </table>
         </div>
       )}
+      {preview}
     </div>
   );
 }

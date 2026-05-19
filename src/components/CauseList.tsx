@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useCaseHover, type HoverCaseData } from "./CaseHoverPreview";
 
 interface CauseRow {
   id: string;
@@ -15,6 +16,9 @@ interface CauseRow {
   next_hearing_date: string | null;
   petitioner: string | null;
   respondent: string | null;
+  judges?: string | null;
+  last_order_summary?: string | null;
+  tags?: string[] | null;
 }
 
 interface CasesPayload {
@@ -32,9 +36,29 @@ function bdgClass(court_type: string): string {
   return m[court_type?.toUpperCase()] || "bdg";
 }
 
+function toHover(c: CauseRow): HoverCaseData {
+  return {
+    id: c.id,
+    case_title: c.case_title,
+    case_type: c.case_type,
+    case_number: c.case_number,
+    case_year: c.case_year,
+    court_type: c.court_type,
+    court_name: c.court_name,
+    current_status: c.current_status,
+    next_hearing_date: c.next_hearing_date,
+    petitioner: c.petitioner,
+    respondent: c.respondent,
+    judges: c.judges ?? null,
+    last_order_summary: c.last_order_summary ?? null,
+    tags: c.tags ?? null,
+  };
+}
+
 export function CauseList() {
   const [rows, setRows] = useState<CauseRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const { rowProps, preview } = useCaseHover();
 
   useEffect(() => {
     fetch("/api/cases")
@@ -78,7 +102,11 @@ export function CauseList() {
                 c.case_title ||
                 `${c.case_type || ""} ${c.case_number}/${c.case_year || ""}`.trim();
               return (
-                <li key={c.id} className="bb-cause-row">
+                <li
+                  key={c.id}
+                  className="bb-cause-row"
+                  {...rowProps(toHover(c))}
+                >
                   <span className="bb-cause-date">
                     {c.next_hearing_date
                       ? new Date(c.next_hearing_date).toLocaleDateString(
@@ -112,6 +140,7 @@ export function CauseList() {
           </ul>
         )}
       </div>
+      {preview}
     </div>
   );
 }
