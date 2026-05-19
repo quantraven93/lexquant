@@ -115,9 +115,32 @@ function ResearchHeader({ view }: { view: ParsedResearchView }) {
             })}
           </span>
         ) : null}
-        {view.author ? <span>Author: {view.author}</span> : null}
+        {view.author ? (
+          <span>
+            Author:{" "}
+            <Link
+              href={`/judges/${encodeURIComponent(view.author)}`}
+              style={{ color: "var(--bb-amber)", textDecoration: "none" }}
+            >
+              {view.author}
+            </Link>
+          </span>
+        ) : null}
         {view.bench.length > 0 ? (
-          <span>Bench: {view.bench.join(", ")}</span>
+          <span>
+            Bench:{" "}
+            {view.bench.map((b, i) => (
+              <span key={b}>
+                {i > 0 ? ", " : null}
+                <Link
+                  href={`/judges/${encodeURIComponent(b)}`}
+                  style={{ color: "var(--bb-amber)", textDecoration: "none" }}
+                >
+                  {b}
+                </Link>
+              </span>
+            ))}
+          </span>
         ) : null}
       </div>
     </div>
