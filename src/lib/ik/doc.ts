@@ -8,12 +8,16 @@
 import { parse } from "node-html-parser";
 import {
   IK_STRUCTURE_TYPES,
+  type IKCitation,
   type IKDocResponse,
   type IKStructureType,
   type ParsedResearchView,
 } from "./types";
 
 const IK_API_BASE = "https://api.indiankanoon.org";
+
+const MAX_CITES = 20;
+const MAX_CITED_BY = 20;
 
 function isStructureType(s: string): s is IKStructureType {
   return (IK_STRUCTURE_TYPES as readonly string[]).includes(s);
@@ -26,7 +30,8 @@ export async function fetchIKDoc(tid: number): Promise<IKDocResponse> {
     throw new Error("Invalid tid");
   }
 
-  const res = await fetch(`${IK_API_BASE}/doc/${tid}/`, {
+  const url = `${IK_API_BASE}/doc/${tid}/?maxcites=${MAX_CITES}&maxcitedby=${MAX_CITED_BY}`;
+  const res = await fetch(url, {
     method: "POST",
     // Empty body forces Content-Length: 0 — without this header IK
     // returns a schema description instead of the document payload.
@@ -44,6 +49,26 @@ export async function fetchIKDoc(tid: number): Promise<IKDocResponse> {
     throw new Error("IK returned malformed doc payload");
   }
   return data;
+}
+
+function normalizeCitations(arr: unknown): IKCitation[] {
+  if (!Array.isArray(arr)) return [];
+  const out: IKCitation[] = [];
+  for (const c of arr) {
+    if (typeof c !== "object" || c === null) continue;
+    const r = c as Record<string, unknown>;
+    const tid = typeof r.tid === "number" ? r.tid : Number(r.tid);
+    if (!Number.isFinite(tid) || tid <= 0) continue;
+    const entry: IKCitation = {
+      tid,
+      title: typeof r.title === "string" ? r.title : "",
+    };
+    if (typeof r.docsource === "string") entry.docsource = r.docsource;
+    if (typeof r.citetext === "string") entry.citetext = r.citetext;
+    if (typeof r.publishdate === "string") entry.publishdate = r.publishdate;
+    out.push(entry);
+  }
+  return out;
 }
 
 function stripEntities(s: string): string {
@@ -100,6 +125,8 @@ export function parseIKDoc(raw: IKDocResponse): ParsedResearchView {
   }
 
   const fullText = stripEntities(root.text);
+  const cites = normalizeCitations(raw.cites);
+  const citedBy = normalizeCitations(raw.citedby);
 
   return {
     tid: raw.tid,
@@ -114,6 +141,8 @@ export function parseIKDoc(raw: IKDocResponse): ParsedResearchView {
     sections,
     fullText,
     docLength: raw.doc.length,
+    cites,
+    citedBy,
   };
 }
 

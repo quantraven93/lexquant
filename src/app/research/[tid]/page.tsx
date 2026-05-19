@@ -6,6 +6,7 @@ import { DashboardShell } from "@/components/DashboardShell";
 import {
   IK_STRUCTURE_LABELS,
   IK_STRUCTURE_RENDER_ORDER,
+  type IKCitation,
   type ParsedResearchView,
 } from "@/lib/ik/types";
 
@@ -171,6 +172,97 @@ function ResearchStats({ view }: { view: ParsedResearchView }) {
   );
 }
 
+function CitationPanel({
+  title,
+  citations,
+  emptyMessage,
+}: {
+  title: string;
+  citations: IKCitation[];
+  emptyMessage: string;
+}) {
+  return (
+    <div className="bb-panel" style={{ marginBottom: "1px" }}>
+      <div className="bb-panel-header">
+        <span className="bb-panel-title">{title}</span>
+        <span className="bb-panel-tag">{citations.length}</span>
+      </div>
+      {citations.length === 0 ? (
+        <div
+          style={{
+            padding: "0.85rem 1rem",
+            color: "var(--bb-gray)",
+            fontSize: "0.7rem",
+            fontFamily: "var(--bb-font, monospace)",
+            letterSpacing: "0.06em",
+          }}
+        >
+          {emptyMessage}
+        </div>
+      ) : (
+        <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+          {citations.map((c) => (
+            <li
+              key={c.tid}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr auto",
+                gap: "0.5rem",
+                alignItems: "baseline",
+                padding: "0.4rem 1rem",
+                borderBottom: "1px solid rgba(0,0,0,0.05)",
+                fontSize: "0.74rem",
+              }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <Link
+                  href={`/research/${c.tid}`}
+                  style={{
+                    color: "var(--bb-white)",
+                    fontFamily: "var(--bb-font-serif, Georgia, serif)",
+                    textDecoration: "none",
+                    lineHeight: 1.35,
+                    display: "block",
+                  }}
+                >
+                  {c.title || `Indian Kanoon doc #${c.tid}`}
+                </Link>
+                {c.citetext || c.docsource ? (
+                  <div
+                    style={{
+                      color: "var(--bb-gray)",
+                      fontFamily: "var(--bb-font, monospace)",
+                      fontSize: "0.6rem",
+                      marginTop: "0.15rem",
+                    }}
+                  >
+                    {[c.docsource, c.citetext].filter(Boolean).join(" · ")}
+                  </div>
+                ) : null}
+              </div>
+              <span
+                style={{
+                  fontFamily: "var(--bb-font, monospace)",
+                  fontSize: "0.58rem",
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  color: "var(--bb-amber)",
+                  border: "1px solid var(--bb-amber-dim)",
+                  padding: "0.15rem 0.45rem",
+                  borderRadius: "2px",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Research
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function FullTextPanel({ text }: { text: string }) {
   const [open, setOpen] = useState(false);
   return (
@@ -320,6 +412,16 @@ export default function ResearchPage({
           <>
             <ResearchHeader view={view} />
             <ResearchStats view={view} />
+            <CitationPanel
+              title="Cites"
+              citations={view.cites}
+              emptyMessage="No outgoing citations parsed."
+            />
+            <CitationPanel
+              title="Cited By"
+              citations={view.citedBy}
+              emptyMessage="No later judgments citing this one yet."
+            />
             {hasAnyStructured ? (
               IK_STRUCTURE_RENDER_ORDER.map((t) =>
                 view.sections[t].length > 0 ? (

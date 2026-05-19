@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getResearchView } from "@/lib/ik/doc";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +28,30 @@ export async function GET(
 
   try {
     const view = await getResearchView(tid);
+
+    // Fire-and-forget cache write — persist citation arrays onto the
+    // judgments row (if one exists for this tid) so future renders can
+    // light the graph instantly without a fresh IK fetch.
+    if (view.cites.length || view.citedBy.length) {
+      const admin = createAdminClient();
+      admin
+        .from("judgments")
+        .update({
+          cites_tids: view.cites.map((c) => c.tid),
+          cited_by_tids: view.citedBy.map((c) => c.tid),
+          citations_fetched_at: new Date().toISOString(),
+        })
+        .eq("ik_tid", tid)
+        .then(({ error }) => {
+          if (error) {
+            console.warn(
+              `[Research] tid=${tid} citation cache failed:`,
+              error.message,
+            );
+          }
+        });
+    }
+
     return NextResponse.json(
       { view },
       {
