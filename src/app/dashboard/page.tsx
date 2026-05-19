@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { DashboardShell } from "@/components/DashboardShell";
-import { StatsCards } from "@/components/StatsCards";
+import { TickerStrip } from "@/components/TickerStrip";
 import { CaseTable } from "@/components/CaseTable";
 import { LiveDigest } from "@/components/LiveDigest";
 import { WatchlistPanel } from "@/components/WatchlistPanel";
+import { CauseList } from "@/components/CauseList";
+import { AIBriefingStrip } from "@/components/AIBriefingStrip";
 
 interface CaseData {
   id: string;
@@ -44,6 +46,10 @@ export default function DashboardPage() {
   const disposedCases = cases.filter(
     (c) => c.current_status === "Disposed",
   ).length;
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const hearingsToday = cases.filter(
+    (c) => c.next_hearing_date === todayIso,
+  ).length;
   const upcomingHearings = cases.filter((c) => {
     if (!c.next_hearing_date) return false;
     const d = new Date(c.next_hearing_date);
@@ -65,12 +71,9 @@ export default function DashboardPage() {
         style={{
           display: "flex",
           flexDirection: "column",
-          gap: "1px",
-          background: "var(--bb-border)",
-          minHeight: "100%",
+          background: "var(--bb-bg)",
         }}
       >
-        {/* Header */}
         <div className="bb-panel-header">
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
             <span className="bb-panel-title">CASE DASHBOARD</span>
@@ -86,6 +89,15 @@ export default function DashboardPage() {
             {today}
           </span>
         </div>
+
+        <TickerStrip
+          total={totalCases}
+          pending={pendingCases}
+          upcomingThisWeek={upcomingHearings}
+          hearingsToday={hearingsToday}
+          disposed={disposedCases}
+          watchlist={0}
+        />
 
         {loading ? (
           <div
@@ -109,25 +121,23 @@ export default function DashboardPage() {
             </span>
           </div>
         ) : (
-          <>
-            <div style={{ background: "var(--bb-panel)" }}>
-              <StatsCards
-                total={totalCases}
-                pending={pendingCases}
-                upcomingThisWeek={upcomingHearings}
-                disposed={disposedCases}
-              />
+          <div className="dash-grid">
+            <div className="col-cause">
+              <CauseList />
             </div>
-            <div style={{ background: "var(--bb-panel)" }}>
-              <LiveDigest limit={10} />
-            </div>
-            <div style={{ background: "var(--bb-panel)" }}>
+            <div className="col-watch">
               <WatchlistPanel />
             </div>
-            <div style={{ background: "var(--bb-panel)" }}>
+            <div className="col-digest">
+              <LiveDigest limit={10} />
+            </div>
+            <div className="col-recent">
               <CaseTable cases={cases} />
             </div>
-          </>
+            <div className="col-ai">
+              <AIBriefingStrip />
+            </div>
+          </div>
         )}
       </div>
     </DashboardShell>
