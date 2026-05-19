@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Sidebar } from "./Sidebar";
 import { StatusBar } from "./StatusBar";
+import { TopBar } from "./TopBar";
 
 /**
  * App-shell grid:
@@ -43,21 +44,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         </div>
       </div>
 
-      <div className="bb-topbar">
-        <div className="bb-topbar-crumbs">HOME / Dashboard</div>
-        <div className="bb-topbar-search-slot" aria-hidden="true">
-          {/* Pass 2: global search lands here */}
-          <span className="bb-topbar-search-stub">
-            <span>⌘ K</span>
-            <span style={{ marginLeft: "0.5rem", opacity: 0.6 }}>
-              search cases · statutes · judges · ask AI
-            </span>
-          </span>
-        </div>
-        <div className="bb-topbar-actions" aria-hidden="true">
-          {/* Pass 2: bell / bookmarks / user chip */}
-        </div>
-      </div>
+      <TopBar />
 
       <aside className="bb-sidebar-zone">
         <Sidebar />
