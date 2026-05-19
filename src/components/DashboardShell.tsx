@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Sidebar } from "./Sidebar";
+import { SideNav } from "./SideNav";
 import { StatusBar } from "./StatusBar";
 import { TopBar } from "./TopBar";
 
@@ -47,7 +47,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       <TopBar />
 
       <aside className="bb-sidebar-zone">
-        <Sidebar />
+        <SideNav />
       </aside>
 
       <main className="bb-main-zone">{children}</main>
