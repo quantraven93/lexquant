@@ -6,6 +6,17 @@
  * as separate panels in the research view.
  */
 
+export interface IKCitation {
+  tid: number;
+  title: string;
+  /** IK's docsource (court / tribunal name). */
+  docsource?: string;
+  /** Reporter citation, e.g. "(2023) 4 SCC 1". */
+  citetext?: string;
+  /** YYYY-MM-DD if IK supplies it. */
+  publishdate?: string | null;
+}
+
 export interface IKDocResponse {
   tid: number;
   title: string;
@@ -19,6 +30,10 @@ export interface IKDocResponse {
   courtcopy?: boolean;
   cats?: Array<{ formInput: string; value: string }>;
   relatedqs?: Array<{ formInput: string; value: string }>;
+  /** Citations made by this judgment (returned when maxcites>0). */
+  cites?: IKCitation[];
+  /** Later judgments that cite this one (returned when maxcitedby>0). */
+  citedby?: IKCitation[];
 }
 
 export const IK_STRUCTURE_TYPES = [
@@ -76,4 +91,8 @@ export interface ParsedResearchView {
   fullText: string;
   /** Length of the original HTML doc returned by IK. */
   docLength: number;
+  /** Judgments cited by this one (head of the in-graph). */
+  cites: IKCitation[];
+  /** Judgments that cite this one (tail of the in-graph). */
+  citedBy: IKCitation[];
 }
