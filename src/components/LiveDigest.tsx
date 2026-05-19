@@ -15,6 +15,7 @@ interface Judgment {
   author: string | null;
   headline: string;
   source_url: string;
+  cited_by_tids: number[] | null;
 }
 
 interface NewsItem {
@@ -31,7 +32,21 @@ interface NewsItem {
 
 type Tab = "judgments" | "news";
 
-const COURT_BADGES: Record<string, string> = {
+const COURT_BDG_CLASS: Record<string, string> = {
+  supremecourt: "bdg sc",
+  scorders: "bdg sc",
+  bombay: "bdg hc",
+  delhi: "bdg hc",
+  chennai: "bdg hc",
+  bangalore: "bdg hc",
+  allahabad: "bdg hc",
+  kolkata_app: "bdg hc",
+  madhyapradesh: "bdg hc",
+  punjab: "bdg hc",
+  jodhpur: "bdg hc",
+};
+
+const COURT_LABEL: Record<string, string> = {
   supremecourt: "SC",
   scorders: "SC.O",
   bombay: "BHC",
@@ -45,63 +60,23 @@ const COURT_BADGES: Record<string, string> = {
   jodhpur: "RAJ",
 };
 
-const ROW_STYLE: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "60px 1fr auto auto",
-  gap: "0.5rem",
-  alignItems: "baseline",
-  padding: "0.4rem 0.75rem",
-  borderBottom: "1px solid rgba(0,0,0,0.05)",
-  fontSize: "0.72rem",
-};
+function shortDate(d: string | null): string {
+  if (!d) return "—";
+  return new Date(d).toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+  });
+}
 
-const NEWS_ROW_STYLE: React.CSSProperties = {
-  ...ROW_STYLE,
-  gridTemplateColumns: "60px 1fr auto",
-};
-
-const RESEARCH_LINK_STYLE: React.CSSProperties = {
-  fontFamily: "var(--bb-font, monospace)",
-  fontSize: "0.58rem",
-  letterSpacing: "0.1em",
-  textTransform: "uppercase",
-  color: "var(--bb-amber)",
-  textDecoration: "none",
-  padding: "0.15rem 0.45rem",
-  border: "1px solid var(--bb-amber-dim)",
-  borderRadius: "2px",
-  whiteSpace: "nowrap",
-};
-
-const BADGE_STYLE: React.CSSProperties = {
-  fontFamily: "var(--bb-font, monospace)",
-  fontSize: "0.6rem",
-  letterSpacing: "0.06em",
-  color: "var(--bb-amber-dim)",
-  fontWeight: 600,
-};
-
-const DATE_STYLE: React.CSSProperties = {
-  fontFamily: "var(--bb-font, monospace)",
-  fontSize: "0.6rem",
-  color: "var(--bb-gray)",
-  whiteSpace: "nowrap",
-};
+function pauseTime(): string {
+  const d = new Date();
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${hh}:${mm} IST`;
+}
 
 function EmptyState({ message }: { message: string }) {
-  return (
-    <div
-      style={{
-        padding: "1.5rem",
-        textAlign: "center",
-        color: "var(--bb-gray)",
-        fontSize: "0.7rem",
-        letterSpacing: "0.08em",
-      }}
-    >
-      {message}
-    </div>
-  );
+  return <div className="bb-digest-empty">{message}</div>;
 }
 
 function TabButton({
@@ -117,22 +92,7 @@ function TabButton({
     <button
       type="button"
       onClick={onClick}
-      style={{
-        background: "transparent",
-        border: "none",
-        cursor: "pointer",
-        fontFamily: "var(--bb-font, monospace)",
-        fontSize: "0.62rem",
-        fontWeight: active ? 700 : 500,
-        letterSpacing: "0.12em",
-        textTransform: "uppercase",
-        color: active ? "var(--bb-amber-dim)" : "var(--bb-gray)",
-        padding: "0.2rem 0.5rem",
-        borderBottom: active
-          ? "2px solid var(--bb-amber)"
-          : "2px solid transparent",
-        marginBottom: "-1px",
-      }}
+      className={`bb-digest-tab ${active ? "is-active" : ""}`}
     >
       {label}
     </button>
@@ -145,6 +105,7 @@ export function LiveDigest({ limit = 10 }: { limit?: number }) {
   const [news, setNews] = useState<NewsItem[]>([]);
   const [loadingJ, setLoadingJ] = useState(true);
   const [loadingN, setLoadingN] = useState(true);
+  const [fetchedAt, setFetchedAt] = useState<string>(pauseTime());
 
   useEffect(() => {
     fetch(`/api/judgments?limit=${limit}`)
@@ -152,6 +113,7 @@ export function LiveDigest({ limit = 10 }: { limit?: number }) {
       .then((data) => {
         setJudgments(data.judgments || []);
         setLoadingJ(false);
+        setFetchedAt(pauseTime());
       })
       .catch(() => setLoadingJ(false));
   }, [limit]);
@@ -167,7 +129,14 @@ export function LiveDigest({ limit = 10 }: { limit?: number }) {
   }, [limit]);
 
   return (
-    <div className="bb-panel">
+    <div
+      className="bb-panel"
+      style={{
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
       <div
         className="bb-panel-header"
         style={{ alignItems: "stretch", paddingTop: 0, paddingBottom: 0 }}
@@ -187,117 +156,99 @@ export function LiveDigest({ limit = 10 }: { limit?: number }) {
             />
           </span>
         </div>
-        <span className="bb-panel-tag">Live</span>
+        <span
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.3rem",
+          }}
+        >
+          <span className="live-dot" />
+          <span className="bb-panel-tag">LIVE</span>
+        </span>
       </div>
 
-      {tab === "judgments" &&
-        (loadingJ ? (
-          <EmptyState message="[LOADING JUDGMENTS...]" />
-        ) : judgments.length === 0 ? (
-          <EmptyState message="NO JUDGMENTS · run cron to populate" />
-        ) : (
-          <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-            {judgments.map((j) => (
-              <li key={j.id} style={ROW_STYLE}>
-                <span style={BADGE_STYLE}>
-                  {COURT_BADGES[j.court_code] ||
-                    j.court_code.slice(0, 4).toUpperCase()}
-                </span>
-                <a
-                  href={j.source_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    color: "var(--bb-white)",
-                    fontFamily: "var(--bb-font-serif, Georgia, serif)",
-                    textDecoration: "none",
-                    lineHeight: 1.4,
-                  }}
-                >
-                  {j.title}
-                  {j.citation ? (
-                    <span
-                      style={{
-                        color: "var(--bb-gray)",
-                        fontFamily: "var(--bb-font, monospace)",
-                        fontSize: "0.62rem",
-                        marginLeft: "0.5rem",
-                      }}
-                    >
-                      · {j.citation}
+      <div style={{ flex: 1, overflow: "auto" }}>
+        {tab === "judgments" &&
+          (loadingJ ? (
+            <EmptyState message="[LOADING JUDGMENTS...]" />
+          ) : judgments.length === 0 ? (
+            <EmptyState message="NO JUDGMENTS · run cron to populate" />
+          ) : (
+            <ul className="bb-digest-list">
+              {judgments.map((j) => {
+                const citedBy = j.cited_by_tids?.length || 0;
+                return (
+                  <li key={j.id} className="bb-digest-row">
+                    <span className="bb-digest-time">
+                      {shortDate(j.publish_date)}
                     </span>
-                  ) : null}
-                </a>
-                <Link
-                  href={`/research/${j.ik_tid}`}
-                  style={RESEARCH_LINK_STYLE}
-                  title="Open structured research view"
-                >
-                  Research
-                </Link>
-                <span style={DATE_STYLE}>
-                  {j.publish_date
-                    ? new Date(j.publish_date).toLocaleDateString("en-IN", {
-                        day: "2-digit",
-                        month: "short",
-                      })
-                    : "—"}
-                </span>
-              </li>
-            ))}
-          </ul>
-        ))}
+                    <span className={COURT_BDG_CLASS[j.court_code] || "bdg"}>
+                      {COURT_LABEL[j.court_code] ||
+                        j.court_code.slice(0, 4).toUpperCase()}
+                    </span>
+                    <Link
+                      href={`/research/${j.ik_tid}`}
+                      className="bb-digest-title"
+                      title={j.title}
+                    >
+                      {j.title}
+                      {j.citation ? (
+                        <span className="bb-digest-meta">· {j.citation}</span>
+                      ) : null}
+                    </Link>
+                    {citedBy > 0 ? (
+                      <span className="bb-digest-cited" title="Cited by">
+                        +{citedBy}
+                      </span>
+                    ) : (
+                      <span className="bb-digest-cited bb-digest-cited-dim">
+                        —
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          ))}
 
-      {tab === "news" &&
-        (loadingN ? (
-          <EmptyState message="[LOADING NEWS...]" />
-        ) : news.length === 0 ? (
-          <EmptyState message="NO NEWS · run cron to populate" />
-        ) : (
-          <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-            {news.map((n) => (
-              <li key={n.id} style={NEWS_ROW_STYLE}>
-                <span style={BADGE_STYLE}>
-                  {SOURCE_BADGES[n.source] ||
-                    n.source.slice(0, 4).toUpperCase()}
-                </span>
-                <a
-                  href={n.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    color: "var(--bb-white)",
-                    fontFamily: "var(--bb-font-serif, Georgia, serif)",
-                    textDecoration: "none",
-                    lineHeight: 1.4,
-                  }}
-                >
-                  {n.title}
-                  {n.author ? (
-                    <span
-                      style={{
-                        color: "var(--bb-gray)",
-                        fontFamily: "var(--bb-font, monospace)",
-                        fontSize: "0.62rem",
-                        marginLeft: "0.5rem",
-                      }}
-                    >
-                      · {n.author}
-                    </span>
-                  ) : null}
-                </a>
-                <span style={DATE_STYLE}>
-                  {n.published_at
-                    ? new Date(n.published_at).toLocaleDateString("en-IN", {
-                        day: "2-digit",
-                        month: "short",
-                      })
-                    : "—"}
-                </span>
-              </li>
-            ))}
-          </ul>
-        ))}
+        {tab === "news" &&
+          (loadingN ? (
+            <EmptyState message="[LOADING NEWS...]" />
+          ) : news.length === 0 ? (
+            <EmptyState message="NO NEWS · run cron to populate" />
+          ) : (
+            <ul className="bb-digest-list">
+              {news.map((n) => (
+                <li key={n.id} className="bb-digest-row bb-digest-row-news">
+                  <span className="bb-digest-time">
+                    {shortDate(n.published_at)}
+                  </span>
+                  <span className="bdg">
+                    {SOURCE_BADGES[n.source] ||
+                      n.source.slice(0, 4).toUpperCase()}
+                  </span>
+                  <a
+                    href={n.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bb-digest-title"
+                    title={n.title}
+                  >
+                    {n.title}
+                    {n.author ? (
+                      <span className="bb-digest-meta">· {n.author}</span>
+                    ) : null}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          ))}
+      </div>
+
+      <div className="bb-digest-footer">
+        stream paused at {fetchedAt} · cron every 30 min
+      </div>
     </div>
   );
 }
