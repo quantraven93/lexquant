@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { DashboardShell } from "@/components/DashboardShell";
 import {
@@ -28,6 +28,9 @@ interface SemanticResponse {
   limit: number;
   structureFilter: string[] | null;
   courtFilter: string[] | null;
+  chunksScanned: number;
+  truncated: boolean;
+  droppedNewJudgments: number;
   results: SemanticHit[];
 }
 
@@ -42,7 +45,10 @@ const COURT_FILTERS: { code: string; label: string }[] = [
 ];
 
 function relevancePct(distance: number): number {
-  return Math.max(0, Math.min(100, Math.round((1 - distance) * 100)));
+  // pgvector `<=>` is cosine DISTANCE with range [0, 2]:
+  //   0 = identical, 1 = orthogonal, 2 = antipodal.
+  // Map to a relevance percentage where identical = 100% and orthogonal = 50%.
+  return Math.max(0, Math.min(100, Math.round(((2 - distance) / 2) * 100)));
 }
 
 function formatDate(iso: string | null): string {
@@ -68,6 +74,16 @@ export default function SemanticSearchPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searched, setSearched] = useState(false);
+  // Tracks the currently in-flight request so a newer submission can abort
+  // an older one — protects against out-of-order responses overwriting the
+  // latest query's results.
+  const inFlightRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      inFlightRef.current?.abort();
+    };
+  }, []);
 
   function toggleStructure(t: IKStructureType) {
     setStructureFilters((prev) => {
@@ -91,6 +107,13 @@ export default function SemanticSearchPage() {
     e.preventDefault();
     const query = q.trim();
     if (query.length < 3) return;
+
+    // Cancel any prior in-flight request so out-of-order responses can't
+    // overwrite the newest query.
+    inFlightRef.current?.abort();
+    const controller = new AbortController();
+    inFlightRef.current = controller;
+
     setLoading(true);
     setError(null);
     setSearched(true);
@@ -102,8 +125,11 @@ export default function SemanticSearchPage() {
       params.set("court", Array.from(courtFilters).join(","));
 
     try {
-      const res = await fetch(`/api/search/semantic?${params}`);
+      const res = await fetch(`/api/search/semantic?${params}`, {
+        signal: controller.signal,
+      });
       const data = (await res.json()) as SemanticResponse | { error?: string };
+      if (controller.signal.aborted) return;
       if (!res.ok) {
         setError(("error" in data && data.error) || `Failed (${res.status})`);
         setResults([]);
@@ -111,10 +137,15 @@ export default function SemanticSearchPage() {
         setResults(("results" in data && data.results) || []);
       }
     } catch (err) {
+      if (controller.signal.aborted) return;
       setError(err instanceof Error ? err.message : "Network error");
       setResults([]);
+    } finally {
+      if (inFlightRef.current === controller) {
+        inFlightRef.current = null;
+        setLoading(false);
+      }
     }
-    setLoading(false);
   }
 
   return (

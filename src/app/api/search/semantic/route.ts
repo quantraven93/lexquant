@@ -16,12 +16,22 @@ import { embedTexts } from "@/lib/embed/voyage";
 import { IK_STRUCTURE_TYPES, type IKStructureType } from "@/lib/ik/types";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 30;
+// Voyage embedTexts allows up to a 60s timeout per attempt plus a 1.5s
+// backoff before its single retry, so worst-case roundtrip is ~61.5s.
+// maxDuration must exceed that or the lambda is killed before the retry
+// can complete.
+export const maxDuration = 75;
 
 const MAX_LIMIT = 25;
 const DEFAULT_LIMIT = 10;
 const CHUNK_OVERFETCH_MULTIPLIER = 4;
 const SNIPPET_CHARS = 320;
+
+// Lowercase → canonical PascalCase map so URL filters can be case-insensitive
+// without losing strict membership validation.
+const STRUCTURE_TYPE_CANONICAL = new Map<string, string>(
+  (IK_STRUCTURE_TYPES as readonly string[]).map((t) => [t.toLowerCase(), t]),
+);
 
 interface SemanticChunkRow {
   ik_tid: number;
@@ -56,13 +66,24 @@ function makeSnippet(content: string): string {
   return content.slice(0, SNIPPET_CHARS).replace(/\s+\S*$/, "") + "…";
 }
 
-function parseStructureTypes(raw: string | null): string[] | null {
-  if (!raw) return null;
-  const tokens = raw
+type StructureFilterResult =
+  | { ok: true; tokens: string[] | null }
+  | { ok: false; invalid: string };
+
+function parseStructureTypes(raw: string | null): StructureFilterResult {
+  if (!raw) return { ok: true, tokens: null };
+  const inputs = raw
     .split(",")
     .map((s) => s.trim())
-    .filter((s) => (IK_STRUCTURE_TYPES as readonly string[]).includes(s));
-  return tokens.length ? tokens : null;
+    .filter(Boolean);
+  if (!inputs.length) return { ok: true, tokens: null };
+  const canonical: string[] = [];
+  for (const t of inputs) {
+    const c = STRUCTURE_TYPE_CANONICAL.get(t.toLowerCase());
+    if (!c) return { ok: false, invalid: t };
+    canonical.push(c);
+  }
+  return { ok: true, tokens: canonical };
 }
 
 function parseCourtCodes(raw: string | null): string[] | null {
@@ -99,14 +120,29 @@ export async function GET(request: Request) {
     );
   }
 
+  const limitParsed = Number.parseInt(url.searchParams.get("limit") || "", 10);
   const limit = Math.min(
     Math.max(
-      Number.parseInt(url.searchParams.get("limit") || "", 10) || DEFAULT_LIMIT,
+      Number.isFinite(limitParsed) && limitParsed > 0
+        ? limitParsed
+        : DEFAULT_LIMIT,
       1,
     ),
     MAX_LIMIT,
   );
-  const structureTypes = parseStructureTypes(url.searchParams.get("structure"));
+
+  const structureResult = parseStructureTypes(
+    url.searchParams.get("structure"),
+  );
+  if (!structureResult.ok) {
+    return NextResponse.json(
+      {
+        error: `Unknown structure filter token: "${structureResult.invalid}". Allowed (case-insensitive): ${(IK_STRUCTURE_TYPES as readonly string[]).join(", ")}`,
+      },
+      { status: 400 },
+    );
+  }
+  const structureTypes = structureResult.tokens;
   const courtCodes = parseCourtCodes(url.searchParams.get("court"));
 
   let queryEmbedding: number[];
@@ -141,13 +177,17 @@ export async function GET(request: Request) {
 
   const rows = (data || []) as SemanticChunkRow[];
   const byJudgment = new Map<number, SemanticHit>();
+  let droppedNewJudgments = 0;
   for (const r of rows) {
     const existing = byJudgment.get(r.ik_tid);
     if (existing) {
       existing.matchedChunks += 1;
       continue;
     }
-    if (byJudgment.size >= limit) continue;
+    if (byJudgment.size >= limit) {
+      droppedNewJudgments += 1;
+      continue;
+    }
     byJudgment.set(r.ik_tid, {
       ikTid: r.ik_tid,
       title: r.title,
@@ -163,11 +203,29 @@ export async function GET(request: Request) {
     });
   }
 
-  return NextResponse.json({
-    query: q,
-    limit,
-    structureFilter: structureTypes,
-    courtFilter: courtCodes,
-    results: Array.from(byJudgment.values()),
-  });
+  // Defensive sort: Map insertion order should already reflect the
+  // SQL ORDER BY distance, but a future refactor that adds intermediate
+  // sorts/streams would silently re-rank. One pass costs nothing here.
+  const results = Array.from(byJudgment.values()).sort(
+    (a, b) => a.distance - b.distance,
+  );
+
+  return NextResponse.json(
+    {
+      query: q,
+      limit,
+      structureFilter: structureTypes,
+      courtFilter: courtCodes,
+      // Caller transparency: how many chunks were scanned vs returned,
+      // and whether more relevant judgments existed past the limit cutoff.
+      chunksScanned: rows.length,
+      truncated: droppedNewJudgments > 0,
+      droppedNewJudgments,
+      results,
+    },
+    {
+      // Auth-gated and per-user; never share between users / sessions.
+      headers: { "Cache-Control": "private, no-store" },
+    },
+  );
 }

@@ -3,6 +3,12 @@
 -- pgvector cosine-distance kNN with optional filters by structure type
 -- and court code. Returns chunks joined to their parent judgment so the
 -- API can render full-context results in one round-trip.
+--
+-- Index note: the HNSW index built in 007 returns ~ef_search candidates
+-- BEFORE the WHERE clause is applied. With default ef_search=40, selective
+-- filters (e.g. Precedent + supremecourt) can yield zero or near-zero rows
+-- even when many true matches exist in the corpus. We bump ef_search to 200
+-- for this function only; cost is bounded and accuracy is materially better.
 -- Run this in Supabase SQL Editor after 007_judgment_chunks.sql.
 -- ============================================
 
@@ -27,6 +33,7 @@ RETURNS TABLE (
 )
 LANGUAGE SQL
 STABLE
+SET hnsw.ef_search = 200
 AS $$
   SELECT
     jc.ik_tid,
