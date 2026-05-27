@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getResearchView } from "@/lib/ik/doc";
@@ -30,36 +30,43 @@ export async function GET(
   try {
     const view = await getResearchView(tid);
 
-    // Fire-and-forget cache write — persist citation arrays onto the
-    // judgments row (if one exists for this tid) so future renders can
-    // light the graph instantly without a fresh IK fetch.
+    // Background work — runs after the response is sent but stays tracked
+    // by the runtime so Vercel won't cancel mid-flight. `after()` is the
+    // Next 16+ replacement for bare fire-and-forget on serverless.
+
+    // Cache the citation arrays onto the judgments row so future renders
+    // can light the graph without a fresh IK fetch.
     if (view.cites.length || view.citedBy.length) {
-      const admin = createAdminClient();
-      admin
-        .from("judgments")
-        .update({
-          cites_tids: view.cites.map((c) => c.tid),
-          cited_by_tids: view.citedBy.map((c) => c.tid),
-          citations_fetched_at: new Date().toISOString(),
-        })
-        .eq("ik_tid", tid)
-        .then(({ error }) => {
-          if (error) {
-            console.warn(
-              `[Research] tid=${tid} citation cache failed:`,
-              error.message,
-            );
-          }
-        });
+      after(async () => {
+        const admin = createAdminClient();
+        const { error } = await admin
+          .from("judgments")
+          .update({
+            cites_tids: view.cites.map((c) => c.tid),
+            cited_by_tids: view.citedBy.map((c) => c.tid),
+            citations_fetched_at: new Date().toISOString(),
+          })
+          .eq("ik_tid", tid);
+        if (error) {
+          console.warn(
+            `[Research] tid=${tid} citation cache failed:`,
+            error.message,
+          );
+        }
+      });
     }
 
-    // Fire-and-forget chunk + embed for semantic search. Idempotent —
-    // skips when judgments.chunks_at is already set. We pass the already-
-    // fetched view so the IK doc call isn't repeated.
+    // Chunk + embed for semantic search. Idempotent — skips when
+    // judgments.chunks_at is already set. Reuses the already-fetched
+    // view so no second IK doc call is made.
     if (process.env.VOYAGE_API_KEY) {
-      embedJudgment(tid, { view }).catch((err) => {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.warn(`[Research] tid=${tid} embed failed:`, msg);
+      after(async () => {
+        try {
+          await embedJudgment(tid, { view });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn(`[Research] tid=${tid} embed failed:`, msg);
+        }
       });
     }
 
