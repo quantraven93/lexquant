@@ -22,6 +22,7 @@ export interface JudgeDocSummary {
   numcitedby: number;
   headline: string;
   source_url: string;
+  bench: string[]; // co-sitting judges on this judgment, as returned by IK
 }
 
 export interface CourtBreakdown {
@@ -34,6 +35,11 @@ export interface YearBreakdown {
   count: number;
 }
 
+export interface BenchCoOccurrence {
+  judge: string;
+  count: number;
+}
+
 export interface JudgeDossier {
   name: string;
   totalFound: number; // IK's "found" field — total matches even when only N returned
@@ -43,6 +49,10 @@ export interface JudgeDossier {
   years: YearBreakdown[];
   totalCitations: number; // sum of numcitedby across returned rulings
   topCited: JudgeDocSummary[]; // top 5 by numcitedby
+  /** Co-sitting judges across this judge's rulings — bias signal. Self excluded. */
+  benchCoOccurrence: BenchCoOccurrence[];
+  /** Authored opinions in the last 90 days, capped at 10, most recent first. */
+  recentActivity: JudgeDocSummary[];
 }
 
 interface IKSearchDoc {
@@ -121,6 +131,7 @@ export async function fetchJudgeDossier(name: string): Promise<JudgeDossier> {
         numcitedby: doc.numcitedby || 0,
         headline: stripBoldTags(doc.headline),
         source_url: `https://indiankanoon.org/doc/${doc.tid}/`,
+        bench: Array.isArray(doc.bench) ? doc.bench.map(stripBoldTags) : [],
       });
     }
     if (data.docs.length < PAGE_SIZE) break;
@@ -153,6 +164,58 @@ export async function fetchJudgeDossier(name: string): Promise<JudgeDossier> {
     .sort((a, b) => b.numcitedby - a.numcitedby)
     .slice(0, 5);
 
+  // Bench co-occurrence — names this judge has shared a bench with, ranked.
+  // We compare normalized forms so e.g. "Justice X" and "X" collapse, but
+  // surface the longest seen variant for display.
+  const cleanLower = cleanName.toLowerCase();
+  const benchMap = new Map<string, { display: string; count: number }>();
+  for (const j of all) {
+    const seenThisDoc = new Set<string>();
+    for (const raw of j.bench) {
+      const trimmed = raw.trim();
+      if (!trimmed) continue;
+      const key = trimmed.toLowerCase();
+      // Skip self — same judge often shows up in their own bench list.
+      if (
+        key === cleanLower ||
+        key.includes(cleanLower) ||
+        cleanLower.includes(key)
+      ) {
+        continue;
+      }
+      if (seenThisDoc.has(key)) continue;
+      seenThisDoc.add(key);
+      const prior = benchMap.get(key);
+      if (prior) {
+        prior.count += 1;
+        if (trimmed.length > prior.display.length) prior.display = trimmed;
+      } else {
+        benchMap.set(key, { display: trimmed, count: 1 });
+      }
+    }
+  }
+  const benchCoOccurrence: BenchCoOccurrence[] = Array.from(benchMap.values())
+    .map((v) => ({ judge: v.display, count: v.count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10);
+
+  // Recent activity — last 90 days from the most recent ruling we saw.
+  const ninetyDaysMs = 90 * 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  const recentActivity = all
+    .filter((j) => {
+      if (!j.publishdate) return false;
+      const t = Date.parse(j.publishdate);
+      if (!Number.isFinite(t)) return false;
+      return now - t <= ninetyDaysMs;
+    })
+    .sort((a, b) => {
+      const ta = a.publishdate ? Date.parse(a.publishdate) : 0;
+      const tb = b.publishdate ? Date.parse(b.publishdate) : 0;
+      return tb - ta;
+    })
+    .slice(0, 10);
+
   return {
     name: cleanName,
     totalFound: totalFound || all.length,
@@ -162,5 +225,7 @@ export async function fetchJudgeDossier(name: string): Promise<JudgeDossier> {
     years,
     totalCitations,
     topCited,
+    benchCoOccurrence,
+    recentActivity,
   };
 }
