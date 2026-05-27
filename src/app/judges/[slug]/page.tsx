@@ -8,6 +8,7 @@ import type {
   JudgeDocSummary,
   CourtBreakdown,
   YearBreakdown,
+  BenchCoOccurrence,
 } from "@/lib/ik/judge";
 
 const STAT_STYLE: React.CSSProperties = {
@@ -385,6 +386,77 @@ export default function JudgePage({
                 }))}
               />
             </div>
+            {dossier.benchCoOccurrence.length > 0 ? (
+              <div className="bb-panel" style={{ marginBottom: "1px" }}>
+                <div className="bb-panel-header">
+                  <span className="bb-panel-title">
+                    Frequently Sits With · Bias Signal
+                  </span>
+                  <span className="bb-panel-tag">
+                    {dossier.benchCoOccurrence.length}
+                  </span>
+                </div>
+                <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                  {dossier.benchCoOccurrence.map((co: BenchCoOccurrence) => (
+                    <li
+                      key={co.judge}
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr auto",
+                        gap: "0.5rem",
+                        alignItems: "baseline",
+                        padding: "0.4rem 1rem",
+                        borderBottom: "1px solid rgba(0,0,0,0.05)",
+                        fontSize: "0.74rem",
+                      }}
+                    >
+                      <Link
+                        href={`/judges/${encodeURIComponent(co.judge)}`}
+                        style={{
+                          color: "var(--bb-white)",
+                          fontFamily: "var(--bb-font-serif, Georgia, serif)",
+                          textDecoration: "none",
+                        }}
+                      >
+                        {co.judge}
+                      </Link>
+                      <span
+                        style={{
+                          fontFamily: "var(--bb-font, monospace)",
+                          fontSize: "0.62rem",
+                          letterSpacing: "0.06em",
+                          color: "var(--bb-amber)",
+                          border: "1px solid var(--bb-amber-dim)",
+                          padding: "0.1rem 0.45rem",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {co.count} cases
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            {dossier.recentActivity.length > 0 ? (
+              <div className="bb-panel" style={{ marginBottom: "1px" }}>
+                <div className="bb-panel-header">
+                  <span className="bb-panel-title">
+                    Recent Activity · Last 90 Days
+                  </span>
+                  <span className="bb-panel-tag">
+                    {dossier.recentActivity.length}
+                  </span>
+                </div>
+                <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                  {dossier.recentActivity.map((j) => (
+                    <JudgmentRow key={`recent-${j.tid}`} j={j} />
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
             {dossier.topCited.length > 0 &&
             dossier.topCited[0].numcitedby > 0 ? (
               <div className="bb-panel" style={{ marginBottom: "1px" }}>
