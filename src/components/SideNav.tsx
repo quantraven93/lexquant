@@ -33,6 +33,7 @@ interface NavRow {
 }
 
 const LIBRARY: NavRow[] = [
+  { label: "Semantic Search", href: "/search/semantic" },
   { label: "Citation Graph", href: "/research" },
   { label: "Acts & Bare", href: "/library/acts" },
   { label: "Rules & Notif.", href: "/library/rules" },
@@ -47,8 +48,13 @@ const COURT_ENTRIES: Array<{ code: string; label: string }> = [
   { code: "CONSUMER", label: "Consumer Fora" },
 ];
 
+// Exact-match these to avoid a parent row lighting up when the user is on
+// a more-specific sibling route (e.g. /search must NOT highlight when the
+// user is on /search/semantic — the latter has its own Library entry).
+const EXACT_MATCH_HREFS = new Set(["/dashboard", "/search"]);
+
 function isRowActive(pathname: string, href: string): boolean {
-  if (href === "/dashboard") return pathname === "/dashboard";
+  if (EXACT_MATCH_HREFS.has(href)) return pathname === href;
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
