@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getResearchView } from "@/lib/ik/doc";
+import { embedJudgment } from "@/lib/embed/store";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -50,6 +51,16 @@ export async function GET(
             );
           }
         });
+    }
+
+    // Fire-and-forget chunk + embed for semantic search. Idempotent —
+    // skips when judgments.chunks_at is already set. We pass the already-
+    // fetched view so the IK doc call isn't repeated.
+    if (process.env.VOYAGE_API_KEY) {
+      embedJudgment(tid, { view }).catch((err) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`[Research] tid=${tid} embed failed:`, msg);
+      });
     }
 
     return NextResponse.json(
