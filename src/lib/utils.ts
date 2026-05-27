@@ -13,20 +13,53 @@ export const COURT_TYPES = [
   { value: "CF", label: "Consumer Forum" },
 ] as const;
 
-export const COURT_TYPE_COLORS: Record<string, string> = {
-  SC: "bg-red-900/30 text-red-400 border border-red-800/50",
-  HC: "bg-amber-900/30 text-amber-400 border border-amber-800/50",
-  DC: "bg-green-900/30 text-green-400 border border-green-800/50",
-  NCLT: "bg-purple-900/30 text-purple-400 border border-purple-800/50",
-  CF: "bg-blue-900/30 text-blue-400 border border-blue-800/50",
+// Bloomberg-terminal badge styles. Returns inline React.CSSProperties so
+// the badges align with the rest of the redesigned UI (--bb-* token system,
+// no Tailwind dependency for color tokens).
+
+import type { CSSProperties } from "react";
+
+const BADGE_BASE: CSSProperties = {
+  display: "inline-block",
+  fontFamily: "var(--bb-font, monospace)",
+  fontSize: "0.6rem",
+  letterSpacing: "0.06em",
+  fontWeight: 600,
+  textTransform: "uppercase",
+  padding: "0.15rem 0.45rem",
+  borderRadius: "2px",
+  border: "1px solid",
+  whiteSpace: "nowrap",
 };
 
-export const STATUS_COLORS: Record<string, string> = {
-  Pending: "bg-amber-900/30 text-amber-400 border border-amber-800/50",
-  Disposed: "bg-green-900/30 text-green-400 border border-green-800/50",
-  Transferred: "bg-blue-900/30 text-blue-400 border border-blue-800/50",
-  Unknown: "bg-gray-800/50 text-gray-500 border border-gray-700/50",
+function badge(color: string): CSSProperties {
+  return { ...BADGE_BASE, color, borderColor: color };
+}
+
+export const COURT_TYPE_BADGE: Record<string, CSSProperties> = {
+  SC: badge("var(--bb-red)"),
+  HC: badge("var(--bb-amber)"),
+  DC: badge("var(--bb-green)"),
+  NCLT: badge("var(--bb-amber-dim)"),
+  CF: badge("var(--bb-gray)"),
 };
+
+export const STATUS_BADGE: Record<string, CSSProperties> = {
+  Pending: badge("var(--bb-amber)"),
+  Disposed: badge("var(--bb-green)"),
+  Transferred: badge("var(--bb-amber-dim)"),
+  Unknown: badge("var(--bb-gray)"),
+};
+
+export function courtTypeBadgeStyle(courtType: string): CSSProperties {
+  return COURT_TYPE_BADGE[courtType] ?? badge("var(--bb-gray)");
+}
+
+export function statusBadgeStyle(
+  status: string | null | undefined,
+): CSSProperties {
+  return STATUS_BADGE[status ?? "Unknown"] ?? STATUS_BADGE.Unknown;
+}
 
 export const INDIAN_STATES = [
   { code: "AP", name: "Andhra Pradesh" },

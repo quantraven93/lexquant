@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { format, differenceInDays } from "date-fns";
-import { cn, COURT_TYPE_COLORS, STATUS_COLORS } from "@/lib/utils";
+import { cn, courtTypeBadgeStyle, statusBadgeStyle } from "@/lib/utils";
 import { useCaseHover, type HoverCaseData } from "./CaseHoverPreview";
 
 interface CaseRow {
@@ -174,26 +174,12 @@ export function CaseTable({ cases }: { cases: CaseRow[] }) {
                     </div>
                   </td>
                   <td>
-                    <span
-                      className={cn(
-                        "inline-flex px-1.5 py-0.5 text-xs font-semibold",
-                        COURT_TYPE_COLORS[c.court_type] ||
-                          "bg-gray-800/50 text-gray-500",
-                      )}
-                      style={{ fontSize: "0.6rem", letterSpacing: "0.04em" }}
-                    >
+                    <span style={courtTypeBadgeStyle(c.court_type)}>
                       {c.court_type}
                     </span>
                   </td>
                   <td>
-                    <span
-                      className={cn(
-                        "inline-flex px-1.5 py-0.5 text-xs font-semibold",
-                        STATUS_COLORS[c.current_status || "Unknown"] ||
-                          "bg-gray-800/50 text-gray-500",
-                      )}
-                      style={{ fontSize: "0.6rem", letterSpacing: "0.04em" }}
-                    >
+                    <span style={statusBadgeStyle(c.current_status)}>
                       {c.current_status || "Unknown"}
                     </span>
                   </td>
