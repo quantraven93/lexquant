@@ -120,35 +120,9 @@ export async function GET(request: Request) {
     );
   }
 
-  // Empty-corpus probe: if no chunks have been embedded yet (fresh deploy
-  // before backfill, or migration applied without VOYAGE_API_KEY) the
-  // search will always return 0 results regardless of query. Surface this
-  // distinctly so the UI can show a "corpus not yet populated" state
-  // rather than the misleading "no matches" message.
-  const { count: chunksCount, error: countErr } = await supabase
-    .from("judgment_chunks")
-    .select("*", { count: "exact", head: true });
-  if (countErr) {
-    console.error("[Semantic] chunk count probe failed:", countErr.message);
-    return NextResponse.json(
-      { error: "Corpus probe failed", details: countErr.message },
-      { status: 502 },
-    );
-  }
-  if (!chunksCount || chunksCount === 0) {
-    return NextResponse.json({
-      query: q,
-      limit: 0,
-      structureFilter: null,
-      courtFilter: null,
-      chunksScanned: 0,
-      truncated: false,
-      droppedNewJudgments: 0,
-      corpusEmpty: true,
-      results: [],
-    });
-  }
-
+  // Parse + validate ALL request inputs before any DB / Voyage work so an
+  // invalid `?structure=...` returns 400 even when the corpus happens to
+  // be empty. (Earlier ordering let corpus-emptiness mask filter errors.)
   const limitParsed = Number.parseInt(url.searchParams.get("limit") || "", 10);
   const limit = Math.min(
     Math.max(
@@ -173,6 +147,35 @@ export async function GET(request: Request) {
   }
   const structureTypes = structureResult.tokens;
   const courtCodes = parseCourtCodes(url.searchParams.get("court"));
+
+  // Empty-corpus probe: if no chunks have been embedded yet (fresh deploy
+  // before backfill, or migration applied without VOYAGE_API_KEY) the
+  // search will always return 0 results regardless of query. Surface this
+  // distinctly so the UI can show a "corpus not yet populated" state
+  // rather than the misleading "no matches" message.
+  const { count: chunksCount, error: countErr } = await supabase
+    .from("judgment_chunks")
+    .select("*", { count: "exact", head: true });
+  if (countErr) {
+    console.error("[Semantic] chunk count probe failed:", countErr.message);
+    return NextResponse.json(
+      { error: "Corpus probe failed", details: countErr.message },
+      { status: 502 },
+    );
+  }
+  if (!chunksCount || chunksCount === 0) {
+    return NextResponse.json({
+      query: q,
+      limit,
+      structureFilter: structureTypes,
+      courtFilter: courtCodes,
+      chunksScanned: 0,
+      truncated: false,
+      droppedNewJudgments: 0,
+      corpusEmpty: true,
+      results: [],
+    });
+  }
 
   let queryEmbedding: number[];
   try {
