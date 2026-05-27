@@ -26,6 +26,14 @@ function estimateTokens(s: string): number {
   return Math.ceil(s.length / 4);
 }
 
+function hardSplit(s: string, limit: number): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < s.length; i += limit) {
+    out.push(s.slice(i, i + limit));
+  }
+  return out;
+}
+
 function splitOversized(p: string, limit: number): string[] {
   if (p.length <= limit) return [p];
   const parts: string[] = [];
@@ -35,8 +43,18 @@ function splitOversized(p: string, limit: number): string[] {
     if (buf.length + s.length + 1 <= limit) {
       buf = buf ? buf + " " + s : s;
     } else {
-      if (buf) parts.push(buf);
-      buf = s.length > limit ? s.slice(0, limit) : s;
+      if (buf) {
+        parts.push(buf);
+        buf = "";
+      }
+      // A single sentence longer than `limit` previously had its tail
+      // silently dropped. Hard-split into limit-sized pieces so no text
+      // is lost from the corpus.
+      if (s.length > limit) {
+        parts.push(...hardSplit(s, limit));
+      } else {
+        buf = s;
+      }
     }
   }
   if (buf) parts.push(buf);

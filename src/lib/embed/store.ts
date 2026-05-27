@@ -19,7 +19,7 @@ const EMBED_BATCH = 64;
 
 export interface EmbedResult {
   tid: number;
-  status: "embedded" | "skipped" | "no-chunks";
+  status: "embedded" | "skipped" | "no-chunks" | "missing-row";
   chunkCount: number;
   tokenCount: number;
 }
@@ -36,25 +36,40 @@ export async function embedJudgment(
 ): Promise<EmbedResult> {
   const supabase = createAdminClient();
 
-  if (!opts.force) {
-    const { data: existing } = await supabase
-      .from("judgments")
-      .select("chunks_at")
-      .eq("ik_tid", tid)
-      .maybeSingle();
-    if (existing?.chunks_at) {
-      return { tid, status: "skipped", chunkCount: 0, tokenCount: 0 };
-    }
+  // Always confirm the parent judgments row exists. If it doesn't, the
+  // judgment_chunks FK would fail AFTER we've already paid Voyage —
+  // bail early. Forced re-embeds still need the row to exist.
+  const { data: existing, error: existingErr } = await supabase
+    .from("judgments")
+    .select("chunks_at")
+    .eq("ik_tid", tid)
+    .maybeSingle();
+  if (existingErr) {
+    throw new Error(`judgments lookup failed: ${existingErr.message}`);
+  }
+  if (!existing) {
+    console.warn(
+      `[embed] tid=${tid} has no judgments row — skipping (would FK-fail)`,
+    );
+    return { tid, status: "missing-row", chunkCount: 0, tokenCount: 0 };
+  }
+  if (!opts.force && existing.chunks_at) {
+    return { tid, status: "skipped", chunkCount: 0, tokenCount: 0 };
   }
 
   const view = opts.view ?? (await getResearchView(tid));
   const chunks = chunkResearchView(view);
 
   if (!chunks.length) {
-    await supabase
+    const { error } = await supabase
       .from("judgments")
       .update({ chunks_at: new Date().toISOString() })
       .eq("ik_tid", tid);
+    if (error) {
+      throw new Error(
+        `chunks_at update (no-chunks path) failed: ${error.message}`,
+      );
+    }
     return { tid, status: "no-chunks", chunkCount: 0, tokenCount: 0 };
   }
 
@@ -66,6 +81,23 @@ export async function embedJudgment(
       "document",
     );
     embeddings.push(...vectors);
+  }
+  if (embeddings.length !== chunks.length) {
+    throw new Error(
+      `Voyage returned ${embeddings.length} embeddings for ${chunks.length} chunks (tid=${tid})`,
+    );
+  }
+
+  // On force re-embed, delete prior chunks first so a smaller new
+  // chunk set doesn't leave orphans with stale content/embeddings.
+  if (opts.force) {
+    const { error: delErr } = await supabase
+      .from("judgment_chunks")
+      .delete()
+      .eq("ik_tid", tid);
+    if (delErr) {
+      throw new Error(`force-delete prior chunks failed: ${delErr.message}`);
+    }
   }
 
   const now = new Date().toISOString();
@@ -81,12 +113,21 @@ export async function embedJudgment(
     embedded_at: now,
   }));
 
-  const { error } = await supabase
+  const { error: upsertErr } = await supabase
     .from("judgment_chunks")
     .upsert(rows, { onConflict: "ik_tid,chunk_index" });
-  if (error) throw new Error(`chunk upsert failed: ${error.message}`);
+  if (upsertErr) throw new Error(`chunk upsert failed: ${upsertErr.message}`);
 
-  await supabase.from("judgments").update({ chunks_at: now }).eq("ik_tid", tid);
+  const { error: markErr } = await supabase
+    .from("judgments")
+    .update({ chunks_at: now })
+    .eq("ik_tid", tid);
+  if (markErr) {
+    // Chunks are written but the marker isn't — next caller will re-embed.
+    // Surface this as an error so the caller can log/retry rather than
+    // silently double-billing Voyage on the next page view.
+    throw new Error(`chunks_at marker update failed: ${markErr.message}`);
+  }
 
   const tokenCount = chunks.reduce((s, c) => s + c.tokenCount, 0);
   return {

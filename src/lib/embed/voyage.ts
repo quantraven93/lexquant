@@ -12,6 +12,9 @@
 const VOYAGE_API = "https://api.voyageai.com/v1/embeddings";
 const MODEL = "voyage-law-2";
 const DIM = 1024;
+// voyage-law-2 context is 16K tokens ≈ ~64K chars (4 chars/token estimate).
+// We warn when a query approaches this so silent head-truncation is visible.
+const QUERY_CHAR_WARN_THRESHOLD = 60_000;
 
 export type VoyageInputType = "document" | "query";
 
@@ -28,6 +31,18 @@ export async function embedTexts(
   if (!texts.length) return [];
   const apiKey = process.env.VOYAGE_API_KEY;
   if (!apiKey) throw new Error("VOYAGE_API_KEY not set");
+
+  // Surface silent head-truncation on long query inputs. Documents are
+  // pre-chunked by the chunker so they don't need this guard.
+  if (inputType === "query") {
+    for (const t of texts) {
+      if (t.length > QUERY_CHAR_WARN_THRESHOLD) {
+        console.warn(
+          `[voyage] query length=${t.length} exceeds ~${QUERY_CHAR_WARN_THRESHOLD} chars; truncation:true will silently drop the tail`,
+        );
+      }
+    }
+  }
 
   const body = JSON.stringify({
     input: texts,
