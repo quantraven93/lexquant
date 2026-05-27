@@ -31,6 +31,7 @@ interface SemanticResponse {
   chunksScanned: number;
   truncated: boolean;
   droppedNewJudgments: number;
+  corpusEmpty: boolean;
   results: SemanticHit[];
 }
 
@@ -71,6 +72,7 @@ export default function SemanticSearchPage() {
   >(new Set());
   const [courtFilters, setCourtFilters] = useState<Set<string>>(new Set());
   const [results, setResults] = useState<SemanticHit[]>([]);
+  const [corpusEmpty, setCorpusEmpty] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searched, setSearched] = useState(false);
@@ -133,13 +135,16 @@ export default function SemanticSearchPage() {
       if (!res.ok) {
         setError(("error" in data && data.error) || `Failed (${res.status})`);
         setResults([]);
+        setCorpusEmpty(false);
       } else {
         setResults(("results" in data && data.results) || []);
+        setCorpusEmpty("corpusEmpty" in data && data.corpusEmpty === true);
       }
     } catch (err) {
       if (controller.signal.aborted) return;
       setError(err instanceof Error ? err.message : "Network error");
       setResults([]);
+      setCorpusEmpty(false);
     } finally {
       if (inFlightRef.current === controller) {
         inFlightRef.current = null;
@@ -338,11 +343,37 @@ export default function SemanticSearchPage() {
               style={{
                 padding: "2rem",
                 textAlign: "center",
-                color: "var(--bb-gray)",
+                color: corpusEmpty ? "var(--bb-amber)" : "var(--bb-gray)",
                 fontSize: "0.78rem",
+                fontFamily: corpusEmpty
+                  ? "var(--bb-font, monospace)"
+                  : undefined,
+                letterSpacing: corpusEmpty ? "0.06em" : undefined,
               }}
             >
-              No matches. Try broader filters or different phrasing.
+              {corpusEmpty ? (
+                <>
+                  [CORPUS NOT YET POPULATED]
+                  <div
+                    style={{
+                      marginTop: "0.6rem",
+                      color: "var(--bb-gray)",
+                      fontSize: "0.7rem",
+                      letterSpacing: "0.04em",
+                      textTransform: "none",
+                    }}
+                  >
+                    No judgment chunks have been embedded yet. Run
+                    <code style={{ margin: "0 0.3rem" }}>
+                      pnpm tsx scripts/backfill-chunks.ts
+                    </code>
+                    or browse the daily judgments to start populating the
+                    semantic index.
+                  </div>
+                </>
+              ) : (
+                "No matches. Try broader filters or different phrasing."
+              )}
             </div>
           </div>
         )}
