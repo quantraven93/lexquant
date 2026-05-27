@@ -33,6 +33,7 @@ interface NavRow {
 }
 
 const LIBRARY: NavRow[] = [
+  { label: "Semantic Search", href: "/search/semantic" },
   { label: "Citation Graph", href: "/research" },
   { label: "Acts & Bare", href: "/library/acts" },
   { label: "Rules & Notif.", href: "/library/rules" },
