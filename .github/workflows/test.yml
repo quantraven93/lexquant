@@ -1,0 +1,65 @@
+name: Test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+# Cancel any in-flight runs for the same branch when a new commit lands.
+concurrency:
+  group: test-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        # Use `npm install` rather than `npm ci` so cross-platform
+        # optional deps (e.g. @emnapi/* on Linux that aren't installed
+        # when the lockfile is generated on macOS) resolve cleanly.
+        run: npm install --no-audit --no-fund
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Lint
+        # Scoped to directories validated by the test suite. The
+        # legacy scraper modules (src/lib/courts/*, src/app/api/courts/*,
+        # src/app/api/cases/[id]/refresh/*) have ~20 pre-existing
+        # lint errors out of scope for this CI gate.
+        run: |
+          npx eslint --max-warnings 50 \
+            src/lib/embed \
+            src/lib/briefing \
+            src/lib/supabase \
+            src/lib/ik \
+            src/lib/news \
+            src/lib/utils.ts \
+            src/app/api/saved-searches \
+            src/app/api/search/semantic \
+            src/app/api/research \
+            src/app/saved-searches \
+            src/app/search/semantic \
+            src/app/research \
+            src/app/case \
+            src/app/judges \
+            src/app/dashboard \
+            src/components
+
+      - name: Unit tests
+        run: npm test
