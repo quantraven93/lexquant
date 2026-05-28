@@ -27,6 +27,16 @@ interface WatchLine {
   added_at: string;
 }
 
+interface SavedSearchAlertLine {
+  name: string;
+  query: string;
+  topTitle: string;
+  topCourt: string;
+  topTid: number;
+  distance: number;
+  newSinceLastRun: number;
+}
+
 function fmtDate(d: string | null): string {
   if (!d) return "—";
   try {
@@ -45,8 +55,16 @@ export function buildBriefingPrompt(input: {
   judgments: JudgmentLine[];
   news: NewsLine[];
   watchlist: WatchLine[];
+  savedSearchAlerts?: SavedSearchAlertLine[];
 }): string {
-  const { briefingDateIST, cases, judgments, news, watchlist } = input;
+  const {
+    briefingDateIST,
+    cases,
+    judgments,
+    news,
+    watchlist,
+    savedSearchAlerts = [],
+  } = input;
 
   const casesBlock =
     cases.length === 0
@@ -91,6 +109,17 @@ export function buildBriefingPrompt(input: {
           .map((w) => `- ${w.label} (${w.source_type || "url"})`)
           .join("\n");
 
+  const alertsBlock =
+    savedSearchAlerts.length === 0
+      ? "(no fresh matches on saved searches)"
+      : savedSearchAlerts
+          .slice(0, 8)
+          .map(
+            (a) =>
+              `- "${a.name}" matched [${a.topCourt}] ${a.topTitle} (relevance ${Math.round(((2 - a.distance) / 2) * 100)}%${a.newSinceLastRun > 1 ? `, ${a.newSinceLastRun} new since last run` : ""})`,
+          )
+          .join("\n");
+
   return [
     `You are the briefing writer for an Indian litigator's "Bloomberg for law" terminal. Write a concise morning briefing for ${briefingDateIST}.`,
     "",
@@ -106,16 +135,20 @@ export function buildBriefingPrompt(input: {
     "WATCHLIST:",
     watchBlock,
     "",
-    "Write the briefing in 3-5 short paragraphs:",
+    "SAVED-SEARCH ALERTS (fresh top matches since last run):",
+    alertsBlock,
+    "",
+    "Write the briefing in 3-6 short paragraphs:",
     "1. Hearings & deadlines today/this week from tracked cases (skip if none).",
     "2. Most consequential new judgment(s) for the litigator's likely practice area. Explain why it matters in plain language.",
     "3. Legal news worth their attention. Skip celebrity / non-substantive.",
     "4. Any watchlist movement.",
+    "5. Saved-search alerts — if any are present, mention each by the search name + the matched case in one sentence each. Drop this paragraph entirely if there are no alerts.",
     "",
     "Rules:",
     "- Plain prose, no markdown headers, no bullet lists.",
     "- Do NOT pad. If a section has nothing, drop it entirely.",
     "- Use Indian English. Avoid intensifiers (clearly, obviously). Cite case names + courts inline.",
-    "- Length cap: ~250 words total.",
+    "- Length cap: ~280 words total.",
   ].join("\n");
 }

@@ -6,6 +6,7 @@ export interface BriefingSignals {
   fresh_judgments: number;
   fresh_news: number;
   watchlist_items: number;
+  saved_search_alerts: number;
 }
 
 export interface GeneratedBriefing {
