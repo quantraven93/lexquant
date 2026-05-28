@@ -8,6 +8,7 @@ import { LiveDigest } from "@/components/LiveDigest";
 import { WatchlistPanel } from "@/components/WatchlistPanel";
 import { CauseList } from "@/components/CauseList";
 import { AIBriefingStrip } from "@/components/AIBriefingStrip";
+import { SavedSearchAlertsStrip } from "@/components/SavedSearchAlertsStrip";
 
 interface CaseData {
   id: string;
@@ -134,8 +135,17 @@ export default function DashboardPage() {
             <div className="col-recent">
               <CaseTable cases={cases} />
             </div>
-            <div className="col-ai">
+            <div
+              className="col-ai"
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "1px",
+                background: "var(--bb-border)",
+              }}
+            >
               <AIBriefingStrip />
+              <SavedSearchAlertsStrip />
             </div>
           </div>
         )}

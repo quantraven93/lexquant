@@ -44,6 +44,7 @@ export default function SavedSearchesPage() {
   const [error, setError] = useState<string | null>(null);
   const [runningId, setRunningId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [runningAll, setRunningAll] = useState(false);
 
   async function fetchSearches(): Promise<{
     ok: boolean;
@@ -108,6 +109,29 @@ export default function SavedSearchesPage() {
     setRunningId(null);
   }
 
+  async function runAll() {
+    if (searches.length === 0 || runningAll) return;
+    setRunningAll(true);
+    // Fire each run in parallel; let individual failures surface as
+    // a single aggregated alert.
+    const results = await Promise.allSettled(
+      searches.map((s) =>
+        fetch(`/api/saved-searches/${s.id}/run`, { method: "POST" }),
+      ),
+    );
+    const failed = results.filter(
+      (r) =>
+        r.status === "rejected" || (r.status === "fulfilled" && !r.value.ok),
+    ).length;
+    await reload();
+    setRunningAll(false);
+    if (failed > 0) {
+      alert(
+        `${failed} of ${results.length} runs failed — see console for details.`,
+      );
+    }
+  }
+
   async function deleteSearch(id: string, name: string) {
     if (!confirm(`Remove saved search "${name}"?`)) return;
     setDeletingId(id);
@@ -140,15 +164,37 @@ export default function SavedSearchesPage() {
       >
         <div className="bb-panel-header">
           <span className="bb-panel-title">SAVED SEARCHES</span>
-          <span
-            style={{
-              fontSize: "0.58rem",
-              color: "var(--bb-gray)",
-              letterSpacing: "0.08em",
-            }}
-          >
-            Save a semantic query to re-run later
-          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+            <span
+              style={{
+                fontSize: "0.58rem",
+                color: "var(--bb-gray)",
+                letterSpacing: "0.08em",
+              }}
+            >
+              Save a semantic query to re-run later
+            </span>
+            <button
+              type="button"
+              onClick={runAll}
+              disabled={runningAll || searches.length === 0}
+              className="bb-btn bb-btn-primary"
+              style={{
+                padding: "0.2rem 0.55rem",
+                fontSize: "0.58rem",
+                opacity: runningAll || searches.length === 0 ? 0.5 : 1,
+                cursor:
+                  runningAll || searches.length === 0
+                    ? "not-allowed"
+                    : "pointer",
+              }}
+              title="Re-run every saved search in parallel"
+            >
+              {runningAll
+                ? "[RUNNING ALL...]"
+                : `[RUN ALL (${searches.length})]`}
+            </button>
+          </div>
         </div>
 
         {loading && (
