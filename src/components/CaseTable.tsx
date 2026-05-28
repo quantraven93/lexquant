@@ -46,12 +46,46 @@ function rowToHover(c: CaseRow): HoverCaseData {
 export function CaseTable({ cases }: { cases: CaseRow[] }) {
   const [filter, setFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
+  const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
   const { rowProps, preview } = useCaseHover();
+
+  // Tag vocabulary across all cases, with frequency, descending.
+  const tagFreq = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const c of cases) {
+      for (const t of c.tags || []) {
+        const key = t.trim();
+        if (!key) continue;
+        counts.set(key, (counts.get(key) || 0) + 1);
+      }
+    }
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 12); // cap to avoid chip overflow
+  }, [cases]);
+
+  function toggleTag(tag: string) {
+    setActiveTags((prev) => {
+      const next = new Set(prev);
+      if (next.has(tag)) next.delete(tag);
+      else next.add(tag);
+      return next;
+    });
+  }
 
   const filtered = useMemo(() => {
     let result = cases;
     if (filter !== "all")
       result = result.filter((c) => c.court_type === filter);
+    if (activeTags.size > 0) {
+      // Intersection semantics — case must carry ALL selected tags. If
+      // users want OR, they can deselect down to one chip.
+      result = result.filter((c) => {
+        const caseTags = new Set((c.tags || []).map((t) => t.trim()));
+        for (const t of activeTags) if (!caseTags.has(t)) return false;
+        return true;
+      });
+    }
     if (search) {
       const q = search.toLowerCase();
       result = result.filter(
@@ -63,7 +97,7 @@ export function CaseTable({ cases }: { cases: CaseRow[] }) {
       );
     }
     return result;
-  }, [cases, filter, search]);
+  }, [cases, filter, activeTags, search]);
 
   const courtTabs = [
     { key: "all", label: "All" },
@@ -125,6 +159,77 @@ export function CaseTable({ cases }: { cases: CaseRow[] }) {
           />
         </div>
       </div>
+
+      {tagFreq.length > 0 && (
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "0.3rem",
+            padding: "0.4rem 0.75rem",
+            background: "var(--bb-panel)",
+            borderBottom: "1px solid var(--bb-border)",
+          }}
+        >
+          <span
+            style={{
+              fontFamily: "var(--bb-font, monospace)",
+              fontSize: "0.55rem",
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              color: "var(--bb-gray)",
+              alignSelf: "center",
+              marginRight: "0.2rem",
+            }}
+          >
+            Tags:
+          </span>
+          {tagFreq.map(([tag, count]) => {
+            const active = activeTags.has(tag);
+            return (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => toggleTag(tag)}
+                style={{
+                  fontFamily: "var(--bb-font, monospace)",
+                  fontSize: "0.58rem",
+                  letterSpacing: "0.04em",
+                  padding: "0.15rem 0.45rem",
+                  border: `1px solid ${
+                    active ? "var(--bb-amber)" : "var(--bb-border)"
+                  }`,
+                  background: active ? "var(--bb-amber)" : "transparent",
+                  color: active ? "var(--bb-bg)" : "var(--bb-gray)",
+                  cursor: "pointer",
+                }}
+              >
+                {tag} <span style={{ opacity: 0.7 }}>{count}</span>
+              </button>
+            );
+          })}
+          {activeTags.size > 0 && (
+            <button
+              type="button"
+              onClick={() => setActiveTags(new Set())}
+              style={{
+                fontFamily: "var(--bb-font, monospace)",
+                fontSize: "0.55rem",
+                letterSpacing: "0.06em",
+                color: "var(--bb-gray)",
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                marginLeft: "auto",
+                alignSelf: "center",
+              }}
+              title="Clear tag filters"
+            >
+              clear ×
+            </button>
+          )}
+        </div>
+      )}
 
       {filtered.length === 0 ? (
         <div className="p-8 text-center" style={{ color: "var(--bb-gray)" }}>
