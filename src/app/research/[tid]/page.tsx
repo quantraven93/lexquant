@@ -171,6 +171,25 @@ function ResearchStats({ view }: { view: ParsedResearchView }) {
         <div style={STAT_STYLE}>Doc Size</div>
       </div>
       <div style={{ marginLeft: "auto", display: "flex", gap: "0.5rem" }}>
+        <Link
+          href={`/search/semantic?q=${encodeURIComponent(
+            view.title.slice(0, 800),
+          )}`}
+          style={{
+            background: "transparent",
+            color: "var(--bb-amber)",
+            padding: "0.4rem 0.8rem",
+            fontFamily: "var(--bb-font, monospace)",
+            fontSize: "0.62rem",
+            fontWeight: 700,
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+            textDecoration: "none",
+            border: "1px solid var(--bb-amber-dim)",
+          }}
+        >
+          Find Similar
+        </Link>
         <a
           href={view.sourceUrl}
           target="_blank"

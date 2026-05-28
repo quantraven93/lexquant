@@ -87,6 +87,22 @@ export default function SemanticSearchPage() {
     };
   }, []);
 
+  // Honour ?q=... on first mount — lets other pages deep-link into a
+  // pre-filled search (e.g. /research/[tid]'s Find Similar button).
+  // useSearchParams would need a Suspense boundary on Next 16 client
+  // components, so we read window.location directly which avoids that
+  // and matches "use client" semantics cleanly.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const initialQ = (params.get("q") || "").trim();
+    if (initialQ.length >= 3) {
+      setQ(initialQ);
+      executeSearch(initialQ);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function toggleStructure(t: IKStructureType) {
     setStructureFilters((prev) => {
       const next = new Set(prev);
@@ -105,9 +121,7 @@ export default function SemanticSearchPage() {
     });
   }
 
-  async function runSearch(e: React.FormEvent) {
-    e.preventDefault();
-    const query = q.trim();
+  async function executeSearch(query: string) {
     if (query.length < 3) return;
 
     // Cancel any prior in-flight request so out-of-order responses can't
@@ -151,6 +165,11 @@ export default function SemanticSearchPage() {
         setLoading(false);
       }
     }
+  }
+
+  async function runSearch(e: React.FormEvent) {
+    e.preventDefault();
+    await executeSearch(q.trim());
   }
 
   return (
