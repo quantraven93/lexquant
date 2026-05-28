@@ -7,6 +7,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateBriefing } from "./llm";
 import { buildBriefingPrompt } from "./prompt";
+import { runStaleSavedSearchesForUser } from "./saved-search-alerts";
 import type { BriefingSignals } from "./types";
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
@@ -107,7 +108,21 @@ export async function generateMorningBriefings(): Promise<IngestResult> {
 
       const trackedCasesCount = cases?.length || 0;
       const watchlistCount = watchlist?.length || 0;
-      if (trackedCasesCount === 0 && watchlistCount === 0) {
+
+      // Saved-search alerts: re-runs stale saved_searches inside the
+      // per-user loop and surfaces any that have a new top match. The
+      // count counts as a signal so a user with only saved searches
+      // still gets a briefing.
+      const savedSearchAlerts = await runStaleSavedSearchesForUser(
+        uid,
+        supabase,
+      );
+
+      if (
+        trackedCasesCount === 0 &&
+        watchlistCount === 0 &&
+        savedSearchAlerts.length === 0
+      ) {
         perUser.push({
           user_id: uid,
           status: "skipped",
@@ -130,6 +145,7 @@ export async function generateMorningBriefings(): Promise<IngestResult> {
         fresh_judgments: judgments?.length || 0,
         fresh_news: news?.length || 0,
         watchlist_items: watchlistCount,
+        saved_search_alerts: savedSearchAlerts.length,
       };
 
       const prompt = buildBriefingPrompt({
@@ -138,6 +154,7 @@ export async function generateMorningBriefings(): Promise<IngestResult> {
         judgments: judgments || [],
         news: news || [],
         watchlist: watchlist || [],
+        savedSearchAlerts,
       });
 
       const result = await generateBriefing(prompt);
