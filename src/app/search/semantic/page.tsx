@@ -172,6 +172,35 @@ export default function SemanticSearchPage() {
     await executeSearch(q.trim());
   }
 
+  async function saveCurrentSearch() {
+    const query = q.trim();
+    if (query.length < 3) return;
+    const defaultName = query.length > 60 ? query.slice(0, 60) + "…" : query;
+    const name = window.prompt("Name this saved search:", defaultName);
+    if (!name || !name.trim()) return;
+
+    try {
+      const res = await fetch("/api/saved-searches", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(),
+          query,
+          structureFilter: Array.from(structureFilters),
+          courtFilter: Array.from(courtFilters),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data?.error || `Save failed (${res.status})`);
+      } else {
+        alert(`Saved as "${name.trim()}". View on /saved-searches.`);
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Network error");
+    }
+  }
+
   return (
     <DashboardShell>
       <div
@@ -227,6 +256,20 @@ export default function SemanticSearchPage() {
                 }}
               >
                 {loading ? "[SEARCHING...]" : "[SEARCH]"}
+              </button>
+              <button
+                type="button"
+                onClick={saveCurrentSearch}
+                disabled={q.trim().length < 3}
+                className="bb-btn bb-btn-secondary"
+                title="Save this query (with current filters) to /saved-searches"
+                style={{
+                  padding: "0 1rem",
+                  opacity: q.trim().length < 3 ? 0.5 : 1,
+                  cursor: q.trim().length < 3 ? "not-allowed" : "pointer",
+                }}
+              >
+                [SAVE]
               </button>
             </div>
 
