@@ -43,7 +43,25 @@ interface CaseUpdate {
   created_at: string;
 }
 
-type TabKey = "listings" | "orders" | "history" | "ai" | "notes";
+type TabKey = "listings" | "orders" | "history" | "similar" | "ai" | "notes";
+
+interface SimilarHit {
+  ikTid: number;
+  title: string;
+  court: string;
+  citation: string | null;
+  publishDate: string | null;
+  snippet: string;
+  distance: number;
+  matchedChunks: number;
+}
+
+interface SimilarResponse {
+  results?: SimilarHit[];
+  corpusEmpty?: boolean;
+  error?: string;
+  details?: string;
+}
 
 export default function CaseDetailPage({
   params,
@@ -61,6 +79,11 @@ export default function CaseDetailPage({
   const [summarizing, setSummarizing] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>("listings");
+  const [similarResults, setSimilarResults] = useState<SimilarHit[]>([]);
+  const [similarLoading, setSimilarLoading] = useState(false);
+  const [similarError, setSimilarError] = useState<string | null>(null);
+  const [similarCorpusEmpty, setSimilarCorpusEmpty] = useState(false);
+  const [similarFetched, setSimilarFetched] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -133,6 +156,53 @@ export default function CaseDetailPage({
     setRefreshing(false);
   }
 
+  async function fetchSimilar() {
+    if (!caseData) return;
+    // Pick the richest single signal we have: case title first, fall back
+    // to the last-order summary, then parties. Anything < 3 chars triggers
+    // the API's min-query guard so we bail early instead.
+    const query = (
+      caseData.case_title?.trim() ||
+      caseData.last_order_summary?.trim() ||
+      [caseData.petitioner, caseData.respondent].filter(Boolean).join(" vs ") ||
+      ""
+    ).slice(0, 800);
+    if (query.length < 3) {
+      setSimilarError("Case has no title or summary to search on.");
+      setSimilarFetched(true);
+      return;
+    }
+    setSimilarLoading(true);
+    setSimilarError(null);
+    try {
+      const params = new URLSearchParams({ q: query, limit: "8" });
+      const res = await fetch(`/api/search/semantic?${params}`);
+      const data = (await res.json()) as SimilarResponse;
+      if (!res.ok) {
+        setSimilarError(data.error || `Semantic search failed (${res.status})`);
+        setSimilarResults([]);
+        setSimilarCorpusEmpty(false);
+      } else {
+        setSimilarResults(data.results || []);
+        setSimilarCorpusEmpty(data.corpusEmpty === true);
+      }
+    } catch (err) {
+      setSimilarError(err instanceof Error ? err.message : "Network error");
+      setSimilarResults([]);
+      setSimilarCorpusEmpty(false);
+    } finally {
+      setSimilarLoading(false);
+      setSimilarFetched(true);
+    }
+  }
+
+  function selectTab(key: TabKey) {
+    setActiveTab(key);
+    if (key === "similar" && !similarFetched && !similarLoading) {
+      fetchSimilar();
+    }
+  }
+
   async function generateSummary() {
     setSummarizing(true);
     try {
@@ -199,6 +269,7 @@ export default function CaseDetailPage({
     { key: "listings", label: "LISTINGS", count: hearings.length },
     { key: "orders", label: "ORDERS", count: orders.length },
     { key: "history", label: "HISTORY", count: updates.length },
+    { key: "similar", label: "SIMILAR JUDGMENTS" },
     { key: "ai", label: "AI ANALYSIS" },
     { key: "notes", label: "NOTES" },
   ];
@@ -515,7 +586,7 @@ export default function CaseDetailPage({
               <button
                 key={t.key}
                 className={cn("bb-tab", activeTab === t.key && "active")}
-                onClick={() => setActiveTab(t.key)}
+                onClick={() => selectTab(t.key)}
               >
                 {t.label}
                 {t.count !== undefined ? ` (${t.count})` : ""}
@@ -734,6 +805,207 @@ export default function CaseDetailPage({
                     </div>
                   ))}
                 </div>
+              )}
+            </div>
+          )}
+
+          {/* Tab: Similar Judgments — semantic search over the corpus */}
+          {activeTab === "similar" && (
+            <div style={{ padding: "0.75rem" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "0.6rem",
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: "0.62rem",
+                    color: "var(--bb-gray)",
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Matched on case title via voyage-law-2 · cosine kNN
+                </span>
+                <button
+                  type="button"
+                  onClick={fetchSimilar}
+                  disabled={similarLoading}
+                  className="bb-btn bb-btn-primary"
+                  style={{
+                    padding: "0.25rem 0.5rem",
+                    fontSize: "0.6rem",
+                    opacity: similarLoading ? 0.6 : 1,
+                  }}
+                >
+                  {similarLoading
+                    ? "[SEARCHING...]"
+                    : similarFetched
+                      ? "[RE-RUN]"
+                      : "[SEARCH]"}
+                </button>
+              </div>
+
+              {similarLoading && (
+                <div
+                  style={{
+                    padding: "1.5rem",
+                    textAlign: "center",
+                    color: "var(--bb-amber)",
+                    fontFamily: "var(--bb-font, monospace)",
+                    fontSize: "0.7rem",
+                    letterSpacing: "0.1em",
+                  }}
+                >
+                  [EMBEDDING QUERY · MATCHING CHUNKS...]
+                </div>
+              )}
+
+              {!similarLoading && similarError && (
+                <div
+                  style={{
+                    padding: "1rem",
+                    color: "var(--bb-red)",
+                    fontFamily: "var(--bb-font, monospace)",
+                    fontSize: "0.7rem",
+                  }}
+                >
+                  ERROR: {similarError}
+                </div>
+              )}
+
+              {!similarLoading &&
+                !similarError &&
+                similarFetched &&
+                similarCorpusEmpty && (
+                  <div
+                    style={{
+                      padding: "1.5rem",
+                      textAlign: "center",
+                      color: "var(--bb-amber)",
+                      fontFamily: "var(--bb-font, monospace)",
+                      fontSize: "0.7rem",
+                      letterSpacing: "0.06em",
+                    }}
+                  >
+                    [CORPUS NOT YET POPULATED]
+                    <div
+                      style={{
+                        marginTop: "0.5rem",
+                        color: "var(--bb-gray)",
+                        fontSize: "0.65rem",
+                        letterSpacing: "0.02em",
+                        textTransform: "none",
+                      }}
+                    >
+                      No judgment chunks have been embedded yet. Run the
+                      backfill script or browse the daily judgments to populate
+                      the semantic index.
+                    </div>
+                  </div>
+                )}
+
+              {!similarLoading &&
+                !similarError &&
+                similarFetched &&
+                !similarCorpusEmpty &&
+                similarResults.length === 0 && (
+                  <div
+                    style={{
+                      padding: "1.5rem",
+                      textAlign: "center",
+                      color: "var(--bb-gray)",
+                      fontSize: "0.72rem",
+                    }}
+                  >
+                    No similar judgments matched on this case&apos;s title.
+                  </div>
+                )}
+
+              {!similarLoading && similarResults.length > 0 && (
+                <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                  {similarResults.map((hit) => {
+                    const pct = Math.max(
+                      0,
+                      Math.min(100, Math.round(((2 - hit.distance) / 2) * 100)),
+                    );
+                    return (
+                      <li
+                        key={hit.ikTid}
+                        style={{
+                          padding: "0.55rem 0",
+                          borderBottom: "1px solid rgba(26,32,48,0.3)",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            gap: "0.75rem",
+                            marginBottom: "0.25rem",
+                          }}
+                        >
+                          <Link
+                            href={`/research/${hit.ikTid}`}
+                            style={{
+                              color: "var(--bb-white)",
+                              fontFamily:
+                                "var(--bb-font-serif, Georgia, serif)",
+                              fontSize: "0.82rem",
+                              textDecoration: "none",
+                              lineHeight: 1.3,
+                            }}
+                          >
+                            {hit.title}
+                          </Link>
+                          <span
+                            style={{
+                              fontFamily: "var(--bb-font, monospace)",
+                              fontSize: "0.6rem",
+                              color: "var(--bb-amber)",
+                              whiteSpace: "nowrap",
+                              letterSpacing: "0.06em",
+                            }}
+                          >
+                            {pct}% match
+                            {hit.matchedChunks > 1
+                              ? ` · ${hit.matchedChunks} hits`
+                              : ""}
+                          </span>
+                        </div>
+                        <div
+                          style={{
+                            fontFamily: "var(--bb-font, monospace)",
+                            fontSize: "0.58rem",
+                            color: "var(--bb-gray)",
+                            letterSpacing: "0.06em",
+                            textTransform: "uppercase",
+                            marginBottom: "0.35rem",
+                          }}
+                        >
+                          {hit.court}
+                          {hit.publishDate ? ` · ${hit.publishDate}` : ""}
+                          {hit.citation ? ` · ${hit.citation}` : ""}
+                        </div>
+                        <div
+                          style={{
+                            fontFamily: "var(--bb-font-serif, Georgia, serif)",
+                            fontSize: "0.74rem",
+                            lineHeight: 1.5,
+                            color: "var(--bb-white)",
+                            borderLeft: "2px solid var(--bb-amber-dim)",
+                            paddingLeft: "0.6rem",
+                          }}
+                        >
+                          {hit.snippet}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
               )}
             </div>
           )}
