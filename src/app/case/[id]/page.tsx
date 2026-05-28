@@ -362,6 +362,21 @@ export default function CaseDetailPage({
               >
                 {refreshing ? "[REFRESHING...]" : "[REFRESH]"}
               </button>
+              <Link
+                href={`/case/${id}/chronology`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bb-btn bb-btn-secondary"
+                style={{
+                  padding: "0.3rem 0.6rem",
+                  fontSize: "0.6rem",
+                  textDecoration: "none",
+                  display: "inline-block",
+                }}
+                title="Open print-friendly chronology in new tab"
+              >
+                [CHRONO]
+              </Link>
               <button
                 onClick={deleteCase}
                 className="bb-btn bb-btn-danger"
