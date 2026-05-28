@@ -13,8 +13,15 @@ import {
   type IKCourtCode,
 } from "@/lib/courts/ik-judgments";
 import { ingestNews } from "@/lib/news/ingest";
+import { embedJudgment } from "@/lib/embed/store";
 
 export const maxDuration = 60;
+
+// Backfill bookkeeping — bound the loop both by tid count AND by wall-clock
+// so we never blow the lambda budget. The remaining backlog rolls over to
+// the next day's cron + organic /research views.
+const CHUNK_BACKFILL_MAX_TIDS = 8;
+const CHUNK_BACKFILL_TIME_BUDGET_MS = 40_000;
 
 const DEFAULT_COURTS: IKCourtCode[] = [
   "supremecourt",
@@ -89,6 +96,83 @@ async function ingestJudgments() {
   };
 }
 
+interface ChunkBackfillResult {
+  attempted: number;
+  embedded: number;
+  skipped: number;
+  errors: number;
+  remainingAfter: number;
+  bailedOnTime: boolean;
+  durationMs: number;
+}
+
+async function backfillPendingChunks(): Promise<ChunkBackfillResult> {
+  const startedAt = Date.now();
+  const supabase = createAdminClient();
+
+  const { data: pending, error } = await supabase
+    .from("judgments")
+    .select("ik_tid")
+    .is("chunks_at", null)
+    .order("publish_date", { ascending: false, nullsFirst: false })
+    .limit(CHUNK_BACKFILL_MAX_TIDS);
+
+  if (error) {
+    // Likely migration 007 not applied yet — column doesn't exist.
+    // Log + return zero; the lazy /research path will keep limping along.
+    console.warn(`[Chunks] Backlog query failed: ${error.message}`);
+    return {
+      attempted: 0,
+      embedded: 0,
+      skipped: 0,
+      errors: 1,
+      remainingAfter: 0,
+      bailedOnTime: false,
+      durationMs: Date.now() - startedAt,
+    };
+  }
+
+  const tids = (pending || []).map((r) => r.ik_tid as number);
+  let attempted = 0;
+  let embedded = 0;
+  let skipped = 0;
+  let errors = 0;
+  let bailedOnTime = false;
+
+  for (const tid of tids) {
+    if (Date.now() - startedAt >= CHUNK_BACKFILL_TIME_BUDGET_MS) {
+      bailedOnTime = true;
+      break;
+    }
+    attempted++;
+    try {
+      const res = await embedJudgment(tid);
+      if (res.status === "embedded") embedded++;
+      else skipped++;
+    } catch (err) {
+      errors++;
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[Chunks] embed tid=${tid} failed: ${msg}`);
+    }
+  }
+
+  // Re-query remaining for caller visibility (cheap, count-only).
+  const { count: remainingAfter } = await supabase
+    .from("judgments")
+    .select("*", { count: "exact", head: true })
+    .is("chunks_at", null);
+
+  return {
+    attempted,
+    embedded,
+    skipped,
+    errors,
+    remainingAfter: remainingAfter || 0,
+    bailedOnTime,
+    durationMs: Date.now() - startedAt,
+  };
+}
+
 export async function GET(request: Request) {
   const auth = request.headers.get("authorization");
   if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -107,7 +191,25 @@ export async function GET(request: Request) {
       console.error("[News] Ingest failed inside judgments cron:", msg);
       news = { error: msg };
     }
-    return NextResponse.json({ judgments, news });
+
+    // Chunk backfill — drains the embed backlog for judgments whose
+    // chunks_at is still NULL. Bounded by tid count + wall-clock so it
+    // never blows the lambda budget; remaining backlog rolls forward.
+    // Skipped entirely if VOYAGE_API_KEY isn't set.
+    let chunks: ChunkBackfillResult | { skipped: string };
+    if (!process.env.VOYAGE_API_KEY) {
+      chunks = { skipped: "VOYAGE_API_KEY not set" };
+    } else {
+      try {
+        chunks = await backfillPendingChunks();
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error("[Chunks] Backfill failed inside cron:", msg);
+        chunks = { skipped: `error: ${msg}` };
+      }
+    }
+
+    return NextResponse.json({ judgments, news, chunks });
   } catch (err) {
     console.error("[Judgments] Fatal:", err);
     return NextResponse.json(
