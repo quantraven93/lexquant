@@ -85,6 +85,8 @@ export default function CaseDetailPage({
   const [similarError, setSimilarError] = useState<string | null>(null);
   const [similarCorpusEmpty, setSimilarCorpusEmpty] = useState(false);
   const [similarFetched, setSimilarFetched] = useState(false);
+  const [summarizingOrders, setSummarizingOrders] = useState(false);
+  const [orderSummariesFetched, setOrderSummariesFetched] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -217,6 +219,45 @@ export default function CaseDetailPage({
     setActiveTab(key);
     if (key === "similar" && !similarFetched && !similarLoading) {
       fetchSimilar();
+    }
+    if (key === "orders" && !orderSummariesFetched && !summarizingOrders) {
+      fetchOrderSummaries();
+    }
+  }
+
+  // Lazily AI-summarise order PDFs the first time the Orders tab is opened.
+  // Only fires when some order has a fetchable PDF (SC) without a cached
+  // summary; HC orders have no pdfUrl so they are left as-is. Summaries are
+  // persisted server-side, so this is a one-time cost per order.
+  async function fetchOrderSummaries() {
+    if (!caseData) return;
+    const ords = (caseData.raw_data?.orders || []) as Array<
+      Record<string, string>
+    >;
+    if (!ords.some((o) => o.pdfUrl && !o.aiSummary)) {
+      setOrderSummariesFetched(true);
+      return;
+    }
+    setSummarizingOrders(true);
+    try {
+      const res = await fetch(`/api/cases/${id}/order-summaries`, {
+        method: "POST",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.orders)) {
+          setCaseData((prev) =>
+            prev
+              ? { ...prev, raw_data: { ...prev.raw_data, orders: data.orders } }
+              : prev,
+          );
+        }
+      }
+    } catch {
+      /* non-fatal: order summaries are best-effort */
+    } finally {
+      setSummarizingOrders(false);
+      setOrderSummariesFetched(true);
     }
   }
 
@@ -718,6 +759,7 @@ export default function CaseDetailPage({
                     <tr>
                       <th>DATE</th>
                       <th>TYPE</th>
+                      <th>AI SUMMARY</th>
                       <th>DOCUMENT</th>
                     </tr>
                   </thead>
@@ -734,6 +776,22 @@ export default function CaseDetailPage({
                         </td>
                         <td style={{ fontSize: "0.72rem" }}>
                           {String(o.orderType || "")}
+                        </td>
+                        <td
+                          style={{
+                            fontSize: "0.72rem",
+                            color: "var(--bb-gray)",
+                            maxWidth: "440px",
+                            lineHeight: 1.35,
+                          }}
+                        >
+                          {o.aiSummary
+                            ? String(o.aiSummary)
+                            : o.pdfUrl
+                              ? summarizingOrders
+                                ? "Summarizing..."
+                                : "—"
+                              : "—"}
                         </td>
                         <td>
                           {o.pdfUrl ? (
