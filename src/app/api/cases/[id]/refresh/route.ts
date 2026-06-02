@@ -201,12 +201,23 @@ export async function POST(
         throw new Error("HC detail response too short");
 
       // Step 5: Parse detail HTML
-      const stripTags = (s: string) =>
-        s
-          .replace(/<[^>]+>/g, "")
-          .replace(/&nbsp;/g, " ")
-          .replace(/&amp;/g, "&")
-          .trim();
+      // eCourts HC case-history renders each field as paired <strong> tags:
+      //   <strong>LABEL</strong><strong>:&nbsp;VALUE</strong>
+      const hcField = (label: string): string => {
+        const m = detailHtml.match(
+          new RegExp(
+            label +
+              "\\s*</strong>\\s*<strong[^>]*>[\\s:]*&nbsp;([^<]*)</strong>",
+            "i",
+          ),
+        );
+        return m
+          ? m[1]
+              .replace(/&nbsp;/g, " ")
+              .replace(/\s+/g, " ")
+              .trim()
+          : "";
+      };
 
       const filingDate =
         detailHtml.match(/Filing Date.*?:\s*(\d{2}-\d{2}-\d{4})/i)?.[1] || "";
@@ -215,20 +226,31 @@ export async function POST(
         "";
       const nextHearing =
         detailHtml.match(/Next Hearing Date.*?:\s*([^<]+)/i)?.[1]?.trim() || "";
+      // Stage: a disposed HC matter exposes "Nature of Disposal" (e.g.
+      // "Contested--DISMISSED AS INFRUCTUOUS"); pending matters fall back to
+      // the older "Stage of Case" label.
       const stage =
-        detailHtml.match(/Stage of Case.*?:\s*([^<]+)/i)?.[1]?.trim() || "";
-      // Find judge from hearing history — look for actual judge name, not column headers
-      const judgeMatch = detailHtml.match(
-        /CAUSE LIST.*?:\s*([A-Z][A-Z\s.]+(?:RAO|REDDY|KUMAR|MISHRA|BHATTI|SHARMA|SINGH|GUPTA|NAIDU|PRASAD|MURTHY|JHA|IYER|NAIR|MENON|PILLAI|DAS|ROY|PATEL|KHAN|ALI|JAIN|AGARWAL|MITHAL|HEGDE|GOWDA|SWAMY|BABU|CHARY|VARMA|VERMA|SAXENA|TYAGI|YADAV|CHAUHAN|THAKUR|RATHORE|MEHTA)[A-Z\s.]*)/i,
-      );
-      let judge = judgeMatch ? judgeMatch[1].trim() : "";
-      // Fallback: look for "Judge" in table data (not headers)
+        hcField("Nature of Disposal") ||
+        detailHtml.match(/Stage of Case.*?:\s*([^<]+)/i)?.[1]?.trim() ||
+        "";
+      // Judge: the bench sits under "Coram", prefixed with an internal code
+      // (e.g. "3521Y. LAKSHMANA RAO"); strip the leading digits. Fall back to
+      // the older cause-list heuristics when Coram is absent.
+      let judge = hcField("Coram").replace(/^\d+/, "").trim();
+      if (!judge) {
+        const judgeMatch = detailHtml.match(
+          /CAUSE LIST.*?:\s*([A-Z][A-Z\s.]+(?:RAO|REDDY|KUMAR|MISHRA|BHATTI|SHARMA|SINGH|GUPTA|NAIDU|PRASAD|MURTHY|JHA|IYER|NAIR|MENON|PILLAI|DAS|ROY|PATEL|KHAN|ALI|JAIN|AGARWAL|MITHAL|HEGDE|GOWDA|SWAMY|BABU|CHARY|VARMA|VERMA|SAXENA|TYAGI|YADAV|CHAUHAN|THAKUR|RATHORE|MEHTA)[A-Z\s.]*)/i,
+        );
+        if (judgeMatch) judge = judgeMatch[1].trim();
+      }
       if (!judge) {
         const judgeData = detailHtml.match(
           /<td[^>]*class="[^"]*"[^>]*>\s*([A-Z][A-Z\s.]{5,50}(?:RAO|REDDY|KUMAR|JHA|SHARMA|SINGH|BHATTI|MISHRA))\s*<\/td>/i,
         );
         if (judgeData) judge = judgeData[1].trim();
       }
+      // Decision date for disposed matters (e.g. "09th April 2026").
+      const decisionDate = hcField("Decision Date");
 
       // Convert DD-MM-YYYY to YYYY-MM-DD
       function toISO(d: string): string | null {
@@ -275,6 +297,10 @@ export async function POST(
       }
       if (stage) updateData.current_status = stage;
       if (judge) updateData.judges = judge;
+      if (decisionDate) {
+        const d = parseHCDate(decisionDate);
+        if (d) updateData.decision_date = d;
+      }
       updateData.raw_data = {
         ...caseData.raw_data,
         sourceHtml: detailHtml,
