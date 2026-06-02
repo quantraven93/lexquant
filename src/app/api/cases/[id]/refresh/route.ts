@@ -252,6 +252,89 @@ export async function POST(
       // Decision date for disposed matters (e.g. "09th April 2026").
       const decisionDate = hcField("Decision Date");
 
+      // Listings (History of Case Hearing) and orders are tables in the same
+      // detail HTML we already fetched. Parse both so the HC LISTINGS/ORDERS
+      // tabs populate like SC. Anchored on stable eCourts section labels.
+      const hcCells = (tr: string): string[] =>
+        [...tr.matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi)].map((c) =>
+          c[1]
+            .replace(/<[^>]+>/g, "")
+            .replace(/&nbsp;/g, " ")
+            .replace(/&amp;/g, "&")
+            .replace(/\s+/g, " ")
+            .trim(),
+        );
+
+      const histIdx = detailHtml.indexOf("History of Case Hearing");
+      const ordersIdx = detailHtml.indexOf(
+        "Orders",
+        histIdx > -1 ? histIdx : 0,
+      );
+      const catIdx = detailHtml.indexOf(
+        "Category Details",
+        ordersIdx > -1 ? ordersIdx : 0,
+      );
+
+      const hcHearings: Array<{
+        date: string;
+        stage: string;
+        purpose: string;
+        judges: string;
+        remarks: string;
+      }> = [];
+      if (histIdx > -1) {
+        const block = detailHtml.slice(
+          histIdx,
+          ordersIdx > -1 ? ordersIdx : undefined,
+        );
+        const seen = new Set<string>();
+        for (const tr of block.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)) {
+          const c = hcCells(tr[1]);
+          if (c.length < 5) continue;
+          // Skip the header row.
+          if (/Cause List Type/i.test(c[0]) || /Hearing Date/i.test(c[3]))
+            continue;
+          const date = c[3] || c[2];
+          if (!/\d{2}-\d{2}-\d{4}/.test(date)) continue;
+          // eCourts lists each sitting twice (once by hearing date, once by
+          // business date); dedupe rows that map to the same entry.
+          const key = `${date}|${c[4]}|${c[0]}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          hcHearings.push({
+            date,
+            stage: c[0],
+            purpose: c[4],
+            judges: c[1],
+            remarks: c[0],
+          });
+        }
+      }
+
+      const hcOrders: Array<{ date: string; orderType: string }> = [];
+      if (ordersIdx > -1) {
+        const block = detailHtml.slice(
+          ordersIdx,
+          catIdx > -1 ? catIdx : ordersIdx + 4000,
+        );
+        const seen = new Set<string>();
+        for (const tr of block.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)) {
+          const c = hcCells(tr[1]);
+          const date = c.find((x) => /^\d{2}-\d{2}-\d{4}$/.test(x));
+          if (!date) continue;
+          const no = c[0] || String(hcOrders.length + 1);
+          if (seen.has(no)) continue;
+          seen.add(no);
+          // eCourts order PDFs (display_pdf.php) are session-gated: the link
+          // returns an HTML error without the live scraper cookie, so store
+          // date + number only. A server-side PDF proxy is a follow-up.
+          hcOrders.push({ date, orderType: `Order ${no}` });
+        }
+      }
+      console.log(
+        `[Refresh HC] ${hcHearings.length} hearings, ${hcOrders.length} orders parsed`,
+      );
+
       // Convert DD-MM-YYYY to YYYY-MM-DD
       function toISO(d: string): string | null {
         const m = d.match(/^(\d{2})-(\d{2})-(\d{4})$/);
@@ -301,10 +384,22 @@ export async function POST(
         const d = parseHCDate(decisionDate);
         if (d) updateData.decision_date = d;
       }
+      if (hcOrders.length > 0) {
+        const latest = hcOrders
+          .map((o) => toISO(o.date))
+          .filter((d): d is string => Boolean(d))
+          .sort()
+          .pop();
+        if (latest) updateData.last_order_date = latest;
+      }
       updateData.raw_data = {
         ...caseData.raw_data,
         sourceHtml: detailHtml,
         hcDetailFetched: true,
+        // Only overwrite when this fetch found rows, so a parse miss does not
+        // wipe previously-stored listings/orders.
+        ...(hcHearings.length > 0 ? { hearings: hcHearings } : {}),
+        ...(hcOrders.length > 0 ? { orders: hcOrders } : {}),
       };
 
       console.log("[Refresh HC] Parsed:", {
