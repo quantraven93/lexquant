@@ -3,6 +3,12 @@ import { courtService } from "@/lib/courts/court-service";
 import { NextResponse } from "next/server";
 import type { CaseIdentifier } from "@/lib/courts/types";
 
+// SC/HC refresh chains a CAPTCHA solve + several sequential court-portal
+// fetches (detail, listings, orders); the default 10s function limit can
+// kill it mid-write and silently drop the persisted orders/hearings. Match
+// the other heavy routes at 60s (Vercel Hobby ceiling).
+export const maxDuration = 60;
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
