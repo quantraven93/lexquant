@@ -78,6 +78,7 @@ export default function CaseDetailPage({
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [summarizing, setSummarizing] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [refreshElapsed, setRefreshElapsed] = useState(0);
   const [activeTab, setActiveTab] = useState<TabKey>("listings");
   const [similarResults, setSimilarResults] = useState<SimilarHit[]>([]);
   const [similarLoading, setSimilarLoading] = useState(false);
@@ -97,6 +98,22 @@ export default function CaseDetailPage({
       })
       .catch(() => setLoading(false));
   }, [id]);
+
+  // Tick a visible elapsed counter while a refresh is in flight. The SC/HC
+  // refresh chains a CAPTCHA solve + several court-portal fetches (20-60s);
+  // without this the UI looks frozen and reads as broken even when it works.
+  useEffect(() => {
+    if (!refreshing) {
+      setRefreshElapsed(0);
+      return;
+    }
+    const started = Date.now();
+    const iv = setInterval(
+      () => setRefreshElapsed(Math.floor((Date.now() - started) / 1000)),
+      1000,
+    );
+    return () => clearInterval(iv);
+  }, [refreshing]);
 
   async function saveNotes() {
     setSaving(true);
@@ -360,7 +377,9 @@ export default function CaseDetailPage({
                   opacity: refreshing ? 0.6 : 1,
                 }}
               >
-                {refreshing ? "[REFRESHING...]" : "[REFRESH]"}
+                {refreshing
+                  ? `[REFRESHING ${refreshElapsed}s...]`
+                  : "[REFRESH]"}
               </button>
               <Link
                 href={`/case/${id}/chronology`}
@@ -621,7 +640,9 @@ export default function CaseDetailPage({
                     fontSize: "0.75rem",
                   }}
                 >
-                  No listing data available. Click [REFRESH] to fetch.
+                  {refreshing
+                    ? `Fetching listings from the court... ${refreshElapsed}s (this can take up to a minute)`
+                    : "No listing data available. Click [REFRESH] to fetch."}
                 </div>
               ) : (
                 <table className="bb-table">
@@ -687,7 +708,9 @@ export default function CaseDetailPage({
                     fontSize: "0.75rem",
                   }}
                 >
-                  No orders available. Click [REFRESH] to fetch.
+                  {refreshing
+                    ? `Fetching orders from the court... ${refreshElapsed}s (this can take up to a minute)`
+                    : "No orders available. Click [REFRESH] to fetch."}
                 </div>
               ) : (
                 <table className="bb-table">
