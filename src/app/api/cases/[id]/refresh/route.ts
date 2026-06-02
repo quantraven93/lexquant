@@ -419,28 +419,31 @@ export async function POST(
               petAdv: caseStatus.petitionerAdvocate,
             });
 
-            // Fetch listing dates tab
-            try {
-              const listRes = await fetch(
-                `https://www.sci.gov.in/wp-admin/admin-ajax.php?action=get_case_details&diary_no=${diaryMatch[1]}&diary_year=${diaryMatch[2]}&tab_name=listing_dates&es_ajax_request=1&language=en`,
-                {
-                  headers: {
-                    "User-Agent": "Mozilla/5.0",
-                    "X-Requested-With": "XMLHttpRequest",
-                    Cookie: sessionCookies,
-                    Referer: "https://www.sci.gov.in/case-status-case-no/",
-                  },
-                  signal: AbortSignal.timeout(10000),
-                },
-              );
-              if (listRes.ok) {
-                const listData = await listRes.json();
-                const listHtml =
-                  typeof listData.data === "string" ? listData.data : "";
-                const listRows = [
-                  ...listHtml.matchAll(/<tr[^>]*>(?!.*<th)([\s\S]*?)<\/tr>/gi),
+            // Listings and orders are independent SC tabs. Fetch them
+            // concurrently (was sequential, ~10s saved), parse into locals,
+            // then merge into caseStatus once both settle so the rawData
+            // spread-merges can't race each other.
+            const scTabBase = `https://www.sci.gov.in/wp-admin/admin-ajax.php?action=get_case_details&diary_no=${diaryMatch[1]}&diary_year=${diaryMatch[2]}`;
+            const scTabHeaders = {
+              "User-Agent": "Mozilla/5.0",
+              "X-Requested-With": "XMLHttpRequest",
+              Cookie: sessionCookies,
+              Referer: "https://www.sci.gov.in/case-status-case-no/",
+            };
+
+            const fetchListings = async () => {
+              try {
+                const res = await fetch(
+                  `${scTabBase}&tab_name=listing_dates&es_ajax_request=1&language=en`,
+                  { headers: scTabHeaders, signal: AbortSignal.timeout(10000) },
+                );
+                if (!res.ok) return [];
+                const data = await res.json();
+                const html = typeof data.data === "string" ? data.data : "";
+                const rows = [
+                  ...html.matchAll(/<tr[^>]*>(?!.*<th)([\s\S]*?)<\/tr>/gi),
                 ];
-                const hearings = listRows
+                return rows
                   .map((r) => {
                     const cells = [
                       ...r[0].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi),
@@ -462,44 +465,24 @@ export async function POST(
                       : null;
                   })
                   .filter(Boolean);
-                if (hearings.length > 0) {
-                  caseStatus.hearingHistory = hearings as Array<{
-                    date: string;
-                    purpose: string;
-                    judge?: string;
-                  }>;
-                  caseStatus.rawData = { ...caseStatus.rawData, hearings };
-                  console.log(
-                    `[Refresh] ${hearings.length} hearing dates found`,
-                  );
-                }
+              } catch {
+                return [];
               }
-            } catch {
-              /* non-fatal */
-            }
+            };
 
-            // Fetch orders tab
-            try {
-              const ordRes = await fetch(
-                `https://www.sci.gov.in/wp-admin/admin-ajax.php?action=get_case_details&diary_no=${diaryMatch[1]}&diary_year=${diaryMatch[2]}&tab_name=judgement_orders&es_ajax_request=1&language=en`,
-                {
-                  headers: {
-                    "User-Agent": "Mozilla/5.0",
-                    "X-Requested-With": "XMLHttpRequest",
-                    Cookie: sessionCookies,
-                    Referer: "https://www.sci.gov.in/case-status-case-no/",
-                  },
-                  signal: AbortSignal.timeout(10000),
-                },
-              );
-              if (ordRes.ok) {
-                const ordData = await ordRes.json();
-                const ordHtml =
-                  typeof ordData.data === "string" ? ordData.data : "";
-                const ordRows = [
-                  ...ordHtml.matchAll(/<tr[^>]*>(?!.*<th)([\s\S]*?)<\/tr>/gi),
+            const fetchOrders = async () => {
+              try {
+                const res = await fetch(
+                  `${scTabBase}&tab_name=judgement_orders&es_ajax_request=1&language=en`,
+                  { headers: scTabHeaders, signal: AbortSignal.timeout(10000) },
+                );
+                if (!res.ok) return [];
+                const data = await res.json();
+                const html = typeof data.data === "string" ? data.data : "";
+                const rows = [
+                  ...html.matchAll(/<tr[^>]*>(?!.*<th)([\s\S]*?)<\/tr>/gi),
                 ];
-                const orders = ordRows
+                return rows
                   .map((r) => {
                     const dateMatch = r[0].match(/(\d{2}-\d{2}-\d{4})/);
                     const pdfMatch = r[0].match(/href="([^"]*\.pdf[^"]*)"/i);
@@ -513,19 +496,34 @@ export async function POST(
                       : null;
                   })
                   .filter(Boolean);
-                if (orders.length > 0) {
-                  caseStatus.orders = orders as Array<{
-                    date: string;
-                    orderType: string;
-                    pdfUrl?: string;
-                  }>;
-                  caseStatus.lastOrderDate = orders[0]?.date;
-                  caseStatus.rawData = { ...caseStatus.rawData, orders };
-                  console.log(`[Refresh] ${orders.length} orders found`);
-                }
+              } catch {
+                return [];
               }
-            } catch {
-              /* non-fatal */
+            };
+
+            const [hearings, orders] = await Promise.all([
+              fetchListings(),
+              fetchOrders(),
+            ]);
+
+            if (hearings.length > 0) {
+              caseStatus.hearingHistory = hearings as Array<{
+                date: string;
+                purpose: string;
+                judge?: string;
+              }>;
+              caseStatus.rawData = { ...caseStatus.rawData, hearings };
+              console.log(`[Refresh] ${hearings.length} hearing dates found`);
+            }
+            if (orders.length > 0) {
+              caseStatus.orders = orders as Array<{
+                date: string;
+                orderType: string;
+                pdfUrl?: string;
+              }>;
+              caseStatus.lastOrderDate = orders[0]?.date;
+              caseStatus.rawData = { ...caseStatus.rawData, orders };
+              console.log(`[Refresh] ${orders.length} orders found`);
             }
           }
         }
