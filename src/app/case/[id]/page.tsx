@@ -811,6 +811,15 @@ export default function CaseDetailPage({
                             >
                               [VIEW PDF]
                             </a>
+                          ) : o.pdfUnavailable ? (
+                            <span
+                              style={{
+                                fontSize: "0.6rem",
+                                color: "var(--bb-gray)",
+                              }}
+                            >
+                              not uploaded by court
+                            </span>
                           ) : (
                             "—"
                           )}
