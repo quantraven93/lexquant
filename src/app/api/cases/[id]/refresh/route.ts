@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { uploadOrderPdf } from "@/lib/storage/order-pdf";
 import { courtService } from "@/lib/courts/court-service";
 import { NextResponse } from "next/server";
 import type { CaseIdentifier } from "@/lib/courts/types";
@@ -311,7 +312,12 @@ export async function POST(
         }
       }
 
-      const hcOrders: Array<{ date: string; orderType: string }> = [];
+      const hcOrders: Array<{
+        date: string;
+        orderType: string;
+        pdfPath?: string;
+      }> = [];
+      const hcOrderHrefs: (string | undefined)[] = [];
       if (ordersIdx > -1) {
         const block = detailHtml.slice(
           ordersIdx,
@@ -325,15 +331,48 @@ export async function POST(
           const no = c[0] || String(hcOrders.length + 1);
           if (seen.has(no)) continue;
           seen.add(no);
-          // eCourts order PDFs (display_pdf.php) are session-gated: the link
-          // returns an HTML error without the live scraper cookie, so store
-          // date + number only. A server-side PDF proxy is a follow-up.
+          const href = tr[1]
+            .match(/href\s*=\s*['"]([^'"]+)['"]/i)?.[1]
+            ?.replace(/&amp;/g, "&");
           hcOrders.push({ date, orderType: `Order ${no}` });
+          hcOrderHrefs.push(href);
         }
       }
-      console.log(
-        `[Refresh HC] ${hcHearings.length} hearings, ${hcOrders.length} orders parsed`,
-      );
+
+      // The display_pdf token is bound to THIS scraper session, so now is the
+      // only moment the actual order PDFs are fetchable. Download each with the
+      // live cookies and store it; the app then serves a signed URL and the AI
+      // summariser reads the stored copy. Bounded so we never blow the budget.
+      {
+        const pdfStart = Date.now();
+        let storedPdfs = 0;
+        for (let i = 0; i < hcOrders.length; i++) {
+          if (storedPdfs >= 8 || Date.now() - pdfStart > 22000) break;
+          const href = hcOrderHrefs[i];
+          if (!href) continue;
+          try {
+            const pdfRes = await fetch(`${HC_BASE}/cases/${href}`, {
+              headers: {
+                "User-Agent": "Mozilla/5.0",
+                Cookie: allCookies,
+                Referer: `${HC_BASE}/cases/o_civil_case_history.php`,
+              },
+              signal: AbortSignal.timeout(12000),
+            });
+            const buf = new Uint8Array(await pdfRes.arrayBuffer());
+            // Real PDFs start with "%PDF"; the session-error page is ~147 bytes.
+            if (buf.length > 800 && buf[0] === 0x25 && buf[1] === 0x50) {
+              hcOrders[i].pdfPath = await uploadOrderPdf(id, i, buf);
+              storedPdfs++;
+            }
+          } catch {
+            /* non-fatal: leave this order without a stored PDF */
+          }
+        }
+        console.log(
+          `[Refresh HC] ${hcHearings.length} hearings, ${hcOrders.length} orders parsed, ${storedPdfs} PDFs stored`,
+        );
+      }
 
       // Convert DD-MM-YYYY to YYYY-MM-DD
       function toISO(d: string): string | null {

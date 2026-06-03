@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { summarizeOrder, isAIConfigured } from "@/lib/claude-ai";
-import { extractPdfText } from "@/lib/pdf/extract";
+import { extractPdfText, extractPdfTextFromBytes } from "@/lib/pdf/extract";
+import { downloadOrderPdf } from "@/lib/storage/order-pdf";
 import { NextResponse } from "next/server";
 
 // Fetching + extracting + summarising several order PDFs is slow; match the
@@ -11,6 +12,7 @@ type Order = {
   date?: string;
   orderType?: string;
   pdfUrl?: string;
+  pdfPath?: string;
   aiSummary?: string;
 };
 
@@ -65,10 +67,13 @@ export async function POST(
   for (const o of orders) {
     if (generated >= MAX_PER_RUN) break;
     if (Date.now() - start > TIME_BUDGET_MS) break;
-    if (!o.pdfUrl || o.aiSummary) continue;
+    // SC orders carry a direct PDF URL; HC orders carry a stored-PDF path.
+    if ((!o.pdfUrl && !o.pdfPath) || o.aiSummary) continue;
     attempted++;
     try {
-      const text = await extractPdfText(o.pdfUrl);
+      const text = o.pdfUrl
+        ? await extractPdfText(o.pdfUrl)
+        : await extractPdfTextFromBytes(await downloadOrderPdf(o.pdfPath!));
       if (text.length < 40) {
         errors.push(`${o.date}: no extractable text (scanned?)`);
         continue;
@@ -94,7 +99,9 @@ export async function POST(
     }
   }
 
-  const remaining = orders.filter((o) => o.pdfUrl && !o.aiSummary).length;
+  const remaining = orders.filter(
+    (o) => (o.pdfUrl || o.pdfPath) && !o.aiSummary,
+  ).length;
   return NextResponse.json({
     orders,
     generated,
