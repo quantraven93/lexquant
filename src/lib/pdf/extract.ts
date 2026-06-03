@@ -17,8 +17,15 @@ export async function extractPdfText(
   });
   if (!res.ok) throw new Error(`PDF fetch failed: ${res.status}`);
 
-  const buf = new Uint8Array(await res.arrayBuffer());
-  const pdf = await getDocumentProxy(buf);
+  return extractPdfTextFromBytes(new Uint8Array(await res.arrayBuffer()));
+}
+
+/** Extract text from already-fetched PDF bytes (e.g. a stored HC order PDF
+ *  downloaded from Supabase Storage). Same normalisation as the URL variant. */
+export async function extractPdfTextFromBytes(
+  bytes: Uint8Array,
+): Promise<string> {
+  const pdf = await getDocumentProxy(bytes);
   const { text } = await extractText(pdf, { mergePages: true });
   const merged = Array.isArray(text) ? text.join(" ") : text;
   return (merged || "").replace(/\s+/g, " ").trim();

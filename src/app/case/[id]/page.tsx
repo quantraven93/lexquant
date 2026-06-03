@@ -234,7 +234,7 @@ export default function CaseDetailPage({
     const ords = (caseData.raw_data?.orders || []) as Array<
       Record<string, string>
     >;
-    if (!ords.some((o) => o.pdfUrl && !o.aiSummary)) {
+    if (!ords.some((o) => (o.pdfUrl || o.pdfPath) && !o.aiSummary)) {
       setOrderSummariesFetched(true);
       return;
     }
@@ -787,16 +787,20 @@ export default function CaseDetailPage({
                         >
                           {o.aiSummary
                             ? String(o.aiSummary)
-                            : o.pdfUrl
+                            : o.pdfUrl || o.pdfPath
                               ? summarizingOrders
                                 ? "Summarizing..."
                                 : "—"
                               : "—"}
                         </td>
                         <td>
-                          {o.pdfUrl ? (
+                          {o.pdfUrl || o.pdfPath ? (
                             <a
-                              href={String(o.pdfUrl)}
+                              href={
+                                o.pdfUrl
+                                  ? String(o.pdfUrl)
+                                  : `/api/cases/${id}/order-pdf?n=${i}`
+                              }
                               target="_blank"
                               rel="noopener noreferrer"
                               className="bb-btn bb-btn-secondary"
