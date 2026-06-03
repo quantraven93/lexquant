@@ -316,6 +316,7 @@ export async function POST(
         date: string;
         orderType: string;
         pdfPath?: string;
+        pdfUnavailable?: boolean;
       }> = [];
       const hcOrderHrefs: (string | undefined)[] = [];
       if (ordersIdx > -1) {
@@ -360,10 +361,19 @@ export async function POST(
               signal: AbortSignal.timeout(12000),
             });
             const buf = new Uint8Array(await pdfRes.arrayBuffer());
-            // Real PDFs start with "%PDF"; the session-error page is ~147 bytes.
+            // Real PDFs start with "%PDF". A short HTML body instead usually
+            // means eCourts has the order entry but the court never uploaded
+            // the signed PDF ("Orders is not uploaded for case ...").
             if (buf.length > 800 && buf[0] === 0x25 && buf[1] === 0x50) {
               hcOrders[i].pdfPath = await uploadOrderPdf(id, i, buf);
               storedPdfs++;
+            } else if (
+              new TextDecoder()
+                .decode(buf.slice(0, 300))
+                .toLowerCase()
+                .includes("not uploaded")
+            ) {
+              hcOrders[i].pdfUnavailable = true;
             }
           } catch {
             /* non-fatal: leave this order without a stored PDF */
