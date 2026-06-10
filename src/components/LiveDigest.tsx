@@ -247,7 +247,7 @@ export function LiveDigest({ limit = 10 }: { limit?: number }) {
       </div>
 
       <div className="bb-digest-footer">
-        stream paused at {fetchedAt} · cron every 30 min
+        fetched at {fetchedAt} · judgments &amp; news ingest daily at 06:30 IST
       </div>
     </div>
   );

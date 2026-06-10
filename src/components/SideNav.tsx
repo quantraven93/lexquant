@@ -32,13 +32,12 @@ interface NavRow {
   count?: number;
 }
 
+// Only routes that actually exist. Citation Graph / Acts & Bare /
+// Rules & Notif. / Commentaries were dead 404 links — re-add each one
+// when its page ships.
 const LIBRARY: NavRow[] = [
   { label: "Semantic Search", href: "/search/semantic" },
   { label: "Saved Searches", href: "/saved-searches" },
-  { label: "Citation Graph", href: "/research" },
-  { label: "Acts & Bare", href: "/library/acts" },
-  { label: "Rules & Notif.", href: "/library/rules" },
-  { label: "Commentaries", href: "/library/commentaries" },
 ];
 
 const COURT_ENTRIES: Array<{ code: string; label: string }> = [

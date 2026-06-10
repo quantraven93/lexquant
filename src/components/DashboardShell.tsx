@@ -39,7 +39,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           </span>
           <span className="bb-menubar-chip">
             <span className="bb-menubar-chip-label">ALERTS</span>
-            <span className="bb-menubar-chip-val">TG + EMAIL</span>
+            <span className="bb-menubar-chip-val">EMAIL</span>
           </span>
         </div>
       </div>

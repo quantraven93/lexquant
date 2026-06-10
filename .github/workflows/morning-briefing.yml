@@ -1,0 +1,21 @@
+name: Morning Briefing
+
+# Vercel Hobby caps the project at 2 crons (already used by update-cases and
+# aggregate-judgments), so the morning briefing fires from GitHub Actions
+# instead — same CRON_SECRET auth as the in-repo scraper workflow.
+on:
+  schedule:
+    - cron: "30 0 * * *" # 00:30 UTC = 06:00 IST
+  workflow_dispatch:
+
+jobs:
+  briefing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Generate morning briefing
+        run: |
+          curl -sf -X POST "${{ secrets.VERCEL_URL }}/api/cron/morning-briefing" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            --max-time 180

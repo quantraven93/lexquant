@@ -29,21 +29,28 @@ function getClient(): Anthropic {
  */
 export async function solveCaptchaWithVision(
   imageBuffer: Buffer,
-  type: "text" | "math" = "text"
+  type: "text" | "math" = "text",
 ): Promise<string | null> {
   // Try free solver first (Sharp + system Tesseract binary, $0)
   try {
-    const { solveCaptchaFree, solveMathCaptchaFree } = await import("@/lib/captcha-free");
-    const freeResult = type === "math"
-      ? await solveMathCaptchaFree(imageBuffer)
-      : await solveCaptchaFree(imageBuffer);
+    const { solveCaptchaFree, solveMathCaptchaFree } =
+      await import("@/lib/captcha-free");
+    const freeResult =
+      type === "math"
+        ? await solveMathCaptchaFree(imageBuffer)
+        : await solveCaptchaFree(imageBuffer);
     if (freeResult) {
       console.log(`[CAPTCHA] Solved FREE (${type}): "${freeResult}"`);
       return freeResult;
     }
-    console.log(`[CAPTCHA] Free solver failed, falling back to Claude Haiku...`);
+    console.log(
+      `[CAPTCHA] Free solver failed, falling back to Claude Haiku...`,
+    );
   } catch (freeErr) {
-    console.warn("[CAPTCHA] Free solver error, falling back to Claude:", freeErr);
+    console.warn(
+      "[CAPTCHA] Free solver error, falling back to Claude:",
+      freeErr,
+    );
   }
 
   // Fallback: Claude Haiku Vision ($0.001/solve)
@@ -51,9 +58,10 @@ export async function solveCaptchaWithVision(
     const client = getClient();
     const base64 = imageBuffer.toString("base64");
 
-    const prompt = type === "math"
-      ? "This image shows a simple math expression like '6 + 4' or '9 - 3'. Calculate the result. Reply with ONLY the numeric answer, nothing else."
-      : "Read the CAPTCHA text in this image. It contains distorted letters and/or numbers. Reply with ONLY the exact characters shown, nothing else. No spaces, no explanation.";
+    const prompt =
+      type === "math"
+        ? "This image shows a simple math expression like '6 + 4' or '9 - 3'. Calculate the result. Reply with ONLY the numeric answer, nothing else."
+        : "Read the CAPTCHA text in this image. It contains distorted letters and/or numbers. Reply with ONLY the exact characters shown, nothing else. No spaces, no explanation.";
 
     const response = await client.messages.create({
       model: "claude-haiku-4-5-20251001",
@@ -80,7 +88,9 @@ export async function solveCaptchaWithVision(
     });
 
     const answer =
-      response.content[0].type === "text" ? response.content[0].text.trim() : "";
+      response.content[0].type === "text"
+        ? response.content[0].text.trim()
+        : "";
 
     // Clean up: remove spaces, quotes, periods, etc.
     const cleaned = answer.replace(/[^a-zA-Z0-9]/g, "");
@@ -102,7 +112,7 @@ export async function solveCaptchaWithVision(
  */
 export async function summarizeOrder(
   orderText: string,
-  caseTitle?: string
+  caseTitle?: string,
 ): Promise<string> {
   try {
     const client = getClient();
@@ -161,9 +171,7 @@ export async function summarizeCase(caseData: {
       caseData.nextHearingDate
         ? `Next Hearing: ${caseData.nextHearingDate}`
         : null,
-      caseData.lastOrderDate
-        ? `Last Order: ${caseData.lastOrderDate}`
-        : null,
+      caseData.lastOrderDate ? `Last Order: ${caseData.lastOrderDate}` : null,
       caseData.lastOrderSummary
         ? `Last Order Summary: ${caseData.lastOrderSummary}`
         : null,
@@ -179,18 +187,38 @@ export async function summarizeCase(caseData: {
             .slice(0, 10)
             .map(
               (u) =>
-                `- ${u.date}: ${u.type}${u.newValue ? ` -> ${u.newValue}` : ""}`
+                `- ${u.date}: ${u.type}${u.newValue ? ` -> ${u.newValue}` : ""}`,
             )
             .join("\n")
         : "";
 
+    const todayIst = new Date().toLocaleDateString("en-IN", {
+      timeZone: "Asia/Kolkata",
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    });
+
     const response = await client.messages.create({
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 300,
+      max_tokens: 500,
       messages: [
         {
           role: "user",
-          content: `You are an Indian legal assistant. Provide a clear, concise case summary in 3-5 sentences. Include: (1) What the case is about, (2) Current status and position, (3) Next steps or what to expect. Use plain language a non-lawyer can understand. Be factual, don't speculate.\n\nSummarize this Indian court case:\n\n${caseContext}${updatesContext}`,
+          content: `You are a litigation analyst writing a case brief for the practising Indian advocate who is tracking this matter. The reader is the lawyer on the case — never advise them to "consult an advocate" and never add disclaimers.
+
+Today's date is ${todayIst} (Indian Standard Time). All dates in the case data below are in ISO format (year-month-day). Read them carefully against today's date before commenting on timing.
+
+Write the brief as PLAIN TEXT only — no markdown, no asterisks, no heading symbols. Use 3 short paragraphs, each opening with a label and a colon, exactly in this order:
+Subject matter: what the case is about and the parties' positions, as far as the data shows.
+Procedural posture: current stage/status, the last order and its date, and the bench if known.
+What next: the next hearing date if scheduled, or the procedural options that follow from the current stage (e.g. for a dismissed criminal revision: certified copy, appeal/SLP limitation considerations).
+
+Be factual and terse. If a field is missing from the data, omit it silently — do not speculate or flag data-entry issues.
+
+Case data:
+
+${caseContext}${updatesContext}`,
         },
       ],
     });
