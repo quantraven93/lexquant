@@ -7,6 +7,7 @@ import { CaseTable } from "@/components/CaseTable";
 import { LiveDigest } from "@/components/LiveDigest";
 import { WatchlistPanel } from "@/components/WatchlistPanel";
 import { CauseList } from "@/components/CauseList";
+import { DisplayBoard } from "@/components/DisplayBoard";
 import { AIBriefingStrip } from "@/components/AIBriefingStrip";
 import { SavedSearchAlertsStrip } from "@/components/SavedSearchAlertsStrip";
 
@@ -138,8 +139,21 @@ export default function DashboardPage() {
           </div>
         ) : (
           <div className="dash-grid">
-            <div className="col-cause">
-              <CauseList />
+            <div
+              className="col-cause"
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "1px",
+                background: "var(--bb-border)",
+              }}
+            >
+              <div style={{ flex: "1.2 1 0", minHeight: 0, display: "flex" }}>
+                <CauseList />
+              </div>
+              <div style={{ flex: "1 1 0", minHeight: 0, display: "flex" }}>
+                <DisplayBoard />
+              </div>
             </div>
             <div className="col-watch">
               <WatchlistPanel />

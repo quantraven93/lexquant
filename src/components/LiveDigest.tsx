@@ -14,6 +14,7 @@ interface Judgment {
   publish_date: string | null;
   author: string | null;
   headline: string;
+  issue_line?: string | null;
   source_url: string;
   cited_by_tids: number[] | null;
 }
@@ -35,6 +36,8 @@ type Tab = "judgments" | "news";
 const COURT_BDG_CLASS: Record<string, string> = {
   supremecourt: "bdg sc",
   scorders: "bdg sc",
+  amravati: "bdg hc",
+  telangana: "bdg hc",
   bombay: "bdg hc",
   delhi: "bdg hc",
   chennai: "bdg hc",
@@ -49,6 +52,8 @@ const COURT_BDG_CLASS: Record<string, string> = {
 const COURT_LABEL: Record<string, string> = {
   supremecourt: "SC",
   scorders: "SC.O",
+  amravati: "APHC",
+  telangana: "TGHC",
   bombay: "BHC",
   delhi: "DHC",
   chennai: "MAD",
@@ -195,6 +200,9 @@ export function LiveDigest({ limit = 10 }: { limit?: number }) {
                       {j.title}
                       {j.citation ? (
                         <span className="bb-digest-meta">· {j.citation}</span>
+                      ) : null}
+                      {j.issue_line ? (
+                        <span className="bb-digest-issue">{j.issue_line}</span>
                       ) : null}
                     </Link>
                     {citedBy > 0 ? (

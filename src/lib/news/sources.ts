@@ -9,16 +9,24 @@ import type { NewsSourceConfig } from "./types";
  *
  * Sources verified live as of ship date (May 2026):
  *   - Bar & Bench, LawBeat, SCC Blog: standard WordPress / RSS 2.0
+ *   - LiveLaw: Google News feed at /google_feeds.xml (verified June
+ *     2026 — 60 items, RSS 2.0 with CDATA; their standard /feed paths
+ *     404 but this one is linked from the homepage)
  *
- * LiveLaw and The Leaflet do not currently expose a working RSS feed
- * (LiveLaw has no public feed, Leaflet's /feed/ and /stories.rss return
- * channel metadata only). They need HTML scraper adapters added later.
+ * The Leaflet does not currently expose a working RSS feed (its /feed/
+ * and /stories.rss return channel metadata only) — needs an HTML
+ * scraper adapter later.
  */
 export const NEWS_SOURCES: NewsSourceConfig[] = [
   {
     code: "barandbench",
     name: "Bar & Bench",
     feedUrl: "https://www.barandbench.com/feed",
+  },
+  {
+    code: "livelaw",
+    name: "LiveLaw",
+    feedUrl: "https://www.livelaw.in/google_feeds.xml",
   },
   {
     code: "lawbeat",
