@@ -21,7 +21,10 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        # `npm install` rather than `npm ci` — same fix as test.yml: the
+        # lockfile is generated on macOS and misses Linux-only optional
+        # deps (@emnapi/*), which makes `npm ci` hard-fail on ubuntu.
+        run: npm install --no-audit --no-fund
 
       - name: Run case update script
         run: npx tsx scripts/update-cases.ts
