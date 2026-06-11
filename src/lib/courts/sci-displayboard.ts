@@ -46,7 +46,7 @@ export async function fetchSciDisplayBoard(): Promise<SciBoardRow[]> {
       Referer: "https://wdb.sci.gov.in/",
       "X-Requested-With": "XMLHttpRequest",
     },
-    signal: AbortSignal.timeout(10_000),
+    signal: AbortSignal.timeout(20_000),
     cache: "no-store",
   });
   if (!res.ok) {

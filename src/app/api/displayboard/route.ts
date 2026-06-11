@@ -11,6 +11,10 @@ import { fetchSciDisplayBoard } from "@/lib/courts/sci-displayboard";
  */
 
 export const dynamic = "force-dynamic";
+// NIC-hosted court sites are slow-to-hostile toward non-Indian IPs:
+// wdb.sci.gov.in times out from Vercel's default iad1 region while
+// responding instantly from India. Pin this function to Mumbai.
+export const preferredRegion = "bom1";
 
 export async function GET() {
   const [aphc, sci] = await Promise.allSettled([
