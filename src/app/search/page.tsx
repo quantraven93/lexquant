@@ -22,7 +22,9 @@ interface SearchResult {
 
 type SearchTab = "party" | "case_number" | "advocate" | "cnr";
 
-const YEARS = Array.from({ length: 30 }, (_, i) => String(new Date().getFullYear() - i));
+const YEARS = Array.from({ length: 30 }, (_, i) =>
+  String(new Date().getFullYear() - i),
+);
 
 export default function SearchPage() {
   const [tab, setTab] = useState<SearchTab>("party");
@@ -33,8 +35,12 @@ export default function SearchPage() {
   const [courtComplex, setCourtComplex] = useState("");
   const [year, setYear] = useState("");
   // Dynamic dropdown data from eCourts API
-  const [districts, setDistricts] = useState<Array<{value: string; label: string}>>([]);
-  const [complexes, setComplexes] = useState<Array<{value: string; label: string}>>([]);
+  const [districts, setDistricts] = useState<
+    Array<{ value: string; label: string }>
+  >([]);
+  const [complexes, setComplexes] = useState<
+    Array<{ value: string; label: string }>
+  >([]);
   const [loadingDropdown, setLoadingDropdown] = useState(false);
   // Party name fields
   const [partyName, setPartyName] = useState("");
@@ -48,47 +54,83 @@ export default function SearchPage() {
 
   // DC state codes mapping (eCourts uses different codes than our INDIAN_STATES)
   const DC_STATES = [
-    { code: "2", name: "Andhra Pradesh" }, { code: "6", name: "Assam" }, { code: "8", name: "Bihar" },
-    { code: "27", name: "Chandigarh" }, { code: "18", name: "Chhattisgarh" }, { code: "26", name: "Delhi" },
-    { code: "30", name: "Goa" }, { code: "17", name: "Gujarat" }, { code: "14", name: "Haryana" },
-    { code: "5", name: "Himachal Pradesh" }, { code: "12", name: "J&K" }, { code: "7", name: "Jharkhand" },
-    { code: "3", name: "Karnataka" }, { code: "4", name: "Kerala" }, { code: "23", name: "Madhya Pradesh" },
-    { code: "1", name: "Maharashtra" }, { code: "25", name: "Manipur" }, { code: "21", name: "Meghalaya" },
-    { code: "11", name: "Odisha" }, { code: "22", name: "Punjab" }, { code: "9", name: "Rajasthan" },
-    { code: "24", name: "Sikkim" }, { code: "10", name: "Tamil Nadu" }, { code: "29", name: "Telangana" },
-    { code: "20", name: "Tripura" }, { code: "15", name: "Uttarakhand" }, { code: "13", name: "Uttar Pradesh" },
+    { code: "2", name: "Andhra Pradesh" },
+    { code: "6", name: "Assam" },
+    { code: "8", name: "Bihar" },
+    { code: "27", name: "Chandigarh" },
+    { code: "18", name: "Chhattisgarh" },
+    { code: "26", name: "Delhi" },
+    { code: "30", name: "Goa" },
+    { code: "17", name: "Gujarat" },
+    { code: "14", name: "Haryana" },
+    { code: "5", name: "Himachal Pradesh" },
+    { code: "12", name: "J&K" },
+    { code: "7", name: "Jharkhand" },
+    { code: "3", name: "Karnataka" },
+    { code: "4", name: "Kerala" },
+    { code: "23", name: "Madhya Pradesh" },
+    { code: "1", name: "Maharashtra" },
+    { code: "25", name: "Manipur" },
+    { code: "21", name: "Meghalaya" },
+    { code: "11", name: "Odisha" },
+    { code: "22", name: "Punjab" },
+    { code: "9", name: "Rajasthan" },
+    { code: "24", name: "Sikkim" },
+    { code: "10", name: "Tamil Nadu" },
+    { code: "29", name: "Telangana" },
+    { code: "20", name: "Tripura" },
+    { code: "15", name: "Uttarakhand" },
+    { code: "13", name: "Uttar Pradesh" },
     { code: "16", name: "West Bengal" },
   ];
 
   // Load districts when state changes
   const loadDistricts = useCallback(async (sc: string) => {
-    if (!sc) { setDistricts([]); return; }
+    if (!sc) {
+      setDistricts([]);
+      return;
+    }
     setLoadingDropdown(true);
     try {
       const res = await fetch(`/api/courts?action=districts&state_code=${sc}`);
       const data = await res.json();
       setDistricts(data.districts || []);
-    } catch { setDistricts([]); }
+    } catch {
+      setDistricts([]);
+    }
     setLoadingDropdown(false);
   }, []);
 
   // Load court complexes when district changes
   const loadComplexes = useCallback(async (sc: string, dc: string) => {
-    if (!sc || !dc) { setComplexes([]); return; }
+    if (!sc || !dc) {
+      setComplexes([]);
+      return;
+    }
     setLoadingDropdown(true);
     try {
-      const res = await fetch(`/api/courts?action=complexes&state_code=${sc}&dist_code=${dc}`);
+      const res = await fetch(
+        `/api/courts?action=complexes&state_code=${sc}&dist_code=${dc}`,
+      );
       const data = await res.json();
       setComplexes(data.complexes || []);
-    } catch { setComplexes([]); }
+    } catch {
+      setComplexes([]);
+    }
     setLoadingDropdown(false);
   }, []);
 
-  useEffect(() => { if (courtType === "DC" && stateCode) loadDistricts(stateCode); }, [courtType, stateCode, loadDistricts]);
-  useEffect(() => { if (courtType === "DC" && stateCode && district) loadComplexes(stateCode, district); }, [courtType, stateCode, district, loadComplexes]);
+  useEffect(() => {
+    if (courtType === "DC" && stateCode) loadDistricts(stateCode);
+  }, [courtType, stateCode, loadDistricts]);
+  useEffect(() => {
+    if (courtType === "DC" && stateCode && district)
+      loadComplexes(stateCode, district);
+  }, [courtType, stateCode, district, loadComplexes]);
 
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [searched, setSearched] = useState(false);
   const [trackingId, setTrackingId] = useState<string | null>(null);
   const [trackedCases, setTrackedCases] = useState<Set<string>>(new Set());
@@ -110,32 +152,59 @@ export default function SearchPage() {
 
     switch (tab) {
       case "party":
-        if (!partyName.trim() || partyName.trim().length < 3) { setLoading(false); return; }
+        if (!partyName.trim() || partyName.trim().length < 3) {
+          setLoading(false);
+          return;
+        }
         params.set("q", partyName.trim());
         break;
       case "case_number":
-        if (!caseNumber.trim()) { setLoading(false); return; }
+        if (!caseNumber.trim()) {
+          setLoading(false);
+          return;
+        }
         params.set("q", caseNumber.trim());
         if (caseType) params.set("case_type", caseType);
         break;
       case "advocate":
-        if (!advocateName.trim() || advocateName.trim().length < 3) { setLoading(false); return; }
+        if (!advocateName.trim() || advocateName.trim().length < 3) {
+          setLoading(false);
+          return;
+        }
         params.set("q", advocateName.trim());
         break;
       case "cnr":
-        if (!cnrNumber.trim() || cnrNumber.trim().length < 10) { setLoading(false); return; }
+        if (!cnrNumber.trim() || cnrNumber.trim().length < 10) {
+          setLoading(false);
+          return;
+        }
         params.set("q", cnrNumber.trim().toUpperCase());
         break;
     }
 
+    setError(null);
     try {
       console.log("[Search] Fetching:", params.toString());
-      const res = await fetch(`/api/search?${params}`);
-      const data = await res.json();
-      console.log("[Search] Results:", data.results?.length || 0);
-      setResults(data.results || []);
+      // Server gives up at 45s; this is the absolute client-side backstop.
+      const res = await fetch(`/api/search?${params}`, {
+        signal: AbortSignal.timeout(65_000),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || `Search failed (HTTP ${res.status})`);
+        setResults([]);
+      } else {
+        console.log("[Search] Results:", data.results?.length || 0);
+        setResults(data.results || []);
+      }
     } catch (err) {
       console.error("[Search] Error:", err);
+      setError(
+        err instanceof DOMException &&
+          (err.name === "TimeoutError" || err.name === "AbortError")
+          ? "Court search timed out. The court portal may be slow or down — pick a specific court instead of All Courts, or retry."
+          : "Network error — could not reach the search service. Check your connection and retry.",
+      );
       setResults([]);
     }
     setLoading(false);
@@ -154,7 +223,11 @@ export default function SearchPage() {
           caseYear: result.caseYear,
           courtCode: result.courtCode,
           cnrNumber: result.cnrNumber,
-          courtName: result.courtName || (courtComplex ? complexes.find(c => c.value === courtComplex)?.label : undefined),
+          courtName:
+            result.courtName ||
+            (courtComplex
+              ? complexes.find((c) => c.value === courtComplex)?.label
+              : undefined),
           caseTitle: result.caseTitle,
           petitioner: result.petitioner,
           respondent: result.respondent,
@@ -165,9 +238,13 @@ export default function SearchPage() {
       });
       if (res.ok) {
         // Stay on search page — mark this result as tracked
-        setTrackedCases(prev => new Set([...prev, result.caseNumber + result.caseYear]));
+        setTrackedCases(
+          (prev) => new Set([...prev, result.caseNumber + result.caseYear]),
+        );
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     setTrackingId(null);
   }
 
@@ -180,7 +257,15 @@ export default function SearchPage() {
 
   return (
     <DashboardShell>
-      <div style={{ display: "flex", flexDirection: "column", gap: "1px", background: "var(--bb-border)", minHeight: "100%" }}>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "1px",
+          background: "var(--bb-border)",
+          minHeight: "100%",
+        }}
+      >
         {/* Header */}
         <div className="bb-panel-header">
           <span className="bb-panel-title">COURT SEARCH TERMINAL</span>
@@ -193,7 +278,11 @@ export default function SearchPage() {
               <button
                 key={t.key}
                 className={`bb-tab ${tab === t.key ? "active" : ""}`}
-                onClick={() => { setTab(t.key); setResults([]); setSearched(false); }}
+                onClick={() => {
+                  setTab(t.key);
+                  setResults([]);
+                  setSearched(false);
+                }}
               >
                 {t.label}
               </button>
@@ -203,15 +292,51 @@ export default function SearchPage() {
           <div className="bb-panel-body" style={{ padding: "1rem" }}>
             <form onSubmit={handleSearch}>
               {/* Cascading court selector */}
-              <div style={{ display: "grid", gridTemplateColumns: courtType === "DC" ? "1fr 1fr 1fr 1fr" : courtType === "HC" ? "1fr 1fr" : "1fr", gap: "0.5rem", marginBottom: "0.75rem" }}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns:
+                    courtType === "DC"
+                      ? "1fr 1fr 1fr 1fr"
+                      : courtType === "HC"
+                        ? "1fr 1fr"
+                        : "1fr",
+                  gap: "0.5rem",
+                  marginBottom: "0.75rem",
+                }}
+              >
                 <div>
-                  <label style={{ display: "block", fontSize: "0.6rem", color: "var(--bb-gray)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.25rem", fontWeight: 600 }}>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "0.6rem",
+                      color: "var(--bb-gray)",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.06em",
+                      marginBottom: "0.25rem",
+                      fontWeight: 600,
+                    }}
+                  >
                     HEARING COURT
                   </label>
-                  <select value={courtType} onChange={(e) => { setCourtType(e.target.value); setHcCode(""); setStateCode(""); setDistrict(""); setCourtComplex(""); setDistricts([]); setComplexes([]); }} style={{ width: "100%" }}>
+                  <select
+                    value={courtType}
+                    onChange={(e) => {
+                      setCourtType(e.target.value);
+                      setHcCode("");
+                      setStateCode("");
+                      setDistrict("");
+                      setCourtComplex("");
+                      setDistricts([]);
+                      setComplexes([]);
+                    }}
+                    style={{ width: "100%" }}
+                  >
                     <option value="">All Courts</option>
                     {COURT_HIERARCHY.map((ct) => (
-                      <option key={ct.value} value={ct.value}>{ct.label}</option>
+                      <option key={ct.value} value={ct.value}>
+                        {ct.label}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -219,13 +344,35 @@ export default function SearchPage() {
                 {/* HC: Show specific High Court selector */}
                 {courtType === "HC" && (
                   <div>
-                    <label style={{ display: "block", fontSize: "0.6rem", color: "var(--bb-gray)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.25rem", fontWeight: 600 }}>
+                    <label
+                      style={{
+                        display: "block",
+                        fontSize: "0.6rem",
+                        color: "var(--bb-gray)",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.06em",
+                        marginBottom: "0.25rem",
+                        fontWeight: 600,
+                      }}
+                    >
                       SELECT HIGH COURT
                     </label>
-                    <select value={hcCode} onChange={(e) => { setHcCode(e.target.value); const hc = HIGH_COURTS.find(h => h.value === e.target.value); if (hc?.stateCode) setStateCode(hc.stateCode); }} style={{ width: "100%" }}>
+                    <select
+                      value={hcCode}
+                      onChange={(e) => {
+                        setHcCode(e.target.value);
+                        const hc = HIGH_COURTS.find(
+                          (h) => h.value === e.target.value,
+                        );
+                        if (hc?.stateCode) setStateCode(hc.stateCode);
+                      }}
+                      style={{ width: "100%" }}
+                    >
                       <option value="">All High Courts</option>
                       {HIGH_COURTS.map((hc) => (
-                        <option key={hc.value + hc.stateCode} value={hc.value}>{hc.label}</option>
+                        <option key={hc.value + hc.stateCode} value={hc.value}>
+                          {hc.label}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -234,13 +381,34 @@ export default function SearchPage() {
                 {/* DC: State selector */}
                 {courtType === "DC" && (
                   <div>
-                    <label style={{ display: "block", fontSize: "0.6rem", color: "var(--bb-gray)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.25rem", fontWeight: 600 }}>
+                    <label
+                      style={{
+                        display: "block",
+                        fontSize: "0.6rem",
+                        color: "var(--bb-gray)",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.06em",
+                        marginBottom: "0.25rem",
+                        fontWeight: 600,
+                      }}
+                    >
                       STATE
                     </label>
-                    <select value={stateCode} onChange={(e) => { setStateCode(e.target.value); setDistrict(""); setCourtComplex(""); setComplexes([]); }} style={{ width: "100%" }}>
+                    <select
+                      value={stateCode}
+                      onChange={(e) => {
+                        setStateCode(e.target.value);
+                        setDistrict("");
+                        setCourtComplex("");
+                        setComplexes([]);
+                      }}
+                      style={{ width: "100%" }}
+                    >
                       <option value="">Select State</option>
                       {DC_STATES.map((s) => (
-                        <option key={s.code} value={s.code}>{s.name}</option>
+                        <option key={s.code} value={s.code}>
+                          {s.name}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -249,13 +417,32 @@ export default function SearchPage() {
                 {/* DC: District selector (dynamic from eCourts) */}
                 {courtType === "DC" && stateCode && (
                   <div>
-                    <label style={{ display: "block", fontSize: "0.6rem", color: "var(--bb-gray)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.25rem", fontWeight: 600 }}>
+                    <label
+                      style={{
+                        display: "block",
+                        fontSize: "0.6rem",
+                        color: "var(--bb-gray)",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.06em",
+                        marginBottom: "0.25rem",
+                        fontWeight: 600,
+                      }}
+                    >
                       DISTRICT {loadingDropdown && "..."}
                     </label>
-                    <select value={district} onChange={(e) => { setDistrict(e.target.value); setCourtComplex(""); }} style={{ width: "100%" }}>
+                    <select
+                      value={district}
+                      onChange={(e) => {
+                        setDistrict(e.target.value);
+                        setCourtComplex("");
+                      }}
+                      style={{ width: "100%" }}
+                    >
                       <option value="">Select District</option>
                       {districts.map((d) => (
-                        <option key={d.value} value={d.value}>{d.label}</option>
+                        <option key={d.value} value={d.value}>
+                          {d.label}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -264,13 +451,29 @@ export default function SearchPage() {
                 {/* DC: Court Complex selector (dynamic from eCourts) */}
                 {courtType === "DC" && district && (
                   <div>
-                    <label style={{ display: "block", fontSize: "0.6rem", color: "var(--bb-gray)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.25rem", fontWeight: 600 }}>
+                    <label
+                      style={{
+                        display: "block",
+                        fontSize: "0.6rem",
+                        color: "var(--bb-gray)",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.06em",
+                        marginBottom: "0.25rem",
+                        fontWeight: 600,
+                      }}
+                    >
                       COURT/BENCH {loadingDropdown && "..."}
                     </label>
-                    <select value={courtComplex} onChange={(e) => setCourtComplex(e.target.value)} style={{ width: "100%" }}>
+                    <select
+                      value={courtComplex}
+                      onChange={(e) => setCourtComplex(e.target.value)}
+                      style={{ width: "100%" }}
+                    >
                       <option value="">Select Court</option>
                       {complexes.map((c) => (
-                        <option key={c.value} value={c.value}>{c.label}</option>
+                        <option key={c.value} value={c.value}>
+                          {c.label}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -279,58 +482,159 @@ export default function SearchPage() {
 
               {/* Tab-specific fields */}
               {tab === "party" && (
-                <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "0.5rem", marginBottom: "0.75rem" }}>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "2fr 1fr",
+                    gap: "0.5rem",
+                    marginBottom: "0.75rem",
+                  }}
+                >
                   <div>
-                    <label style={{ display: "block", fontSize: "0.6rem", color: "var(--bb-gray)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.25rem", fontWeight: 600 }}>
+                    <label
+                      style={{
+                        display: "block",
+                        fontSize: "0.6rem",
+                        color: "var(--bb-gray)",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.06em",
+                        marginBottom: "0.25rem",
+                        fontWeight: 600,
+                      }}
+                    >
                       PARTY NAME
                     </label>
-                    <input type="text" value={partyName} onChange={(e) => setPartyName(e.target.value)}
-                      placeholder="Enter party name (min 3 chars)" style={{ width: "100%" }} />
+                    <input
+                      type="text"
+                      value={partyName}
+                      onChange={(e) => setPartyName(e.target.value)}
+                      placeholder="Enter party name (min 3 chars)"
+                      style={{ width: "100%" }}
+                    />
                   </div>
                   <div>
-                    <label style={{ display: "block", fontSize: "0.6rem", color: "var(--bb-gray)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.25rem", fontWeight: 600 }}>
+                    <label
+                      style={{
+                        display: "block",
+                        fontSize: "0.6rem",
+                        color: "var(--bb-gray)",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.06em",
+                        marginBottom: "0.25rem",
+                        fontWeight: 600,
+                      }}
+                    >
                       YEAR
                     </label>
-                    <select value={year} onChange={(e) => setYear(e.target.value)} style={{ width: "100%" }}>
+                    <select
+                      value={year}
+                      onChange={(e) => setYear(e.target.value)}
+                      style={{ width: "100%" }}
+                    >
                       <option value="">All Years</option>
-                      {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+                      {YEARS.map((y) => (
+                        <option key={y} value={y}>
+                          {y}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 </div>
               )}
 
               {tab === "case_number" && (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.5rem", marginBottom: "0.75rem" }}>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr 1fr",
+                    gap: "0.5rem",
+                    marginBottom: "0.75rem",
+                  }}
+                >
                   <div>
-                    <label style={{ display: "block", fontSize: "0.6rem", color: "var(--bb-gray)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.25rem", fontWeight: 600 }}>
+                    <label
+                      style={{
+                        display: "block",
+                        fontSize: "0.6rem",
+                        color: "var(--bb-gray)",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.06em",
+                        marginBottom: "0.25rem",
+                        fontWeight: 600,
+                      }}
+                    >
                       CASE TYPE
                     </label>
                     {courtType === "SC" ? (
-                      <select value={caseType} onChange={(e) => setCaseType(e.target.value)} style={{ width: "100%" }}>
+                      <select
+                        value={caseType}
+                        onChange={(e) => setCaseType(e.target.value)}
+                        style={{ width: "100%" }}
+                      >
                         <option value="">Select Case Type</option>
                         {SC_CASE_TYPES.map((ct) => (
-                          <option key={ct.value} value={ct.value}>{ct.label}</option>
+                          <option key={ct.value} value={ct.value}>
+                            {ct.label}
+                          </option>
                         ))}
                       </select>
                     ) : (
-                      <input type="text" value={caseType} onChange={(e) => setCaseType(e.target.value)}
-                        placeholder="e.g. WP, SLP, CRL.A" style={{ width: "100%" }} />
+                      <input
+                        type="text"
+                        value={caseType}
+                        onChange={(e) => setCaseType(e.target.value)}
+                        placeholder="e.g. WP, SLP, CRL.A"
+                        style={{ width: "100%" }}
+                      />
                     )}
                   </div>
                   <div>
-                    <label style={{ display: "block", fontSize: "0.6rem", color: "var(--bb-gray)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.25rem", fontWeight: 600 }}>
+                    <label
+                      style={{
+                        display: "block",
+                        fontSize: "0.6rem",
+                        color: "var(--bb-gray)",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.06em",
+                        marginBottom: "0.25rem",
+                        fontWeight: 600,
+                      }}
+                    >
                       CASE NUMBER
                     </label>
-                    <input type="text" value={caseNumber} onChange={(e) => setCaseNumber(e.target.value)}
-                      placeholder="e.g. 1234" style={{ width: "100%" }} />
+                    <input
+                      type="text"
+                      value={caseNumber}
+                      onChange={(e) => setCaseNumber(e.target.value)}
+                      placeholder="e.g. 1234"
+                      style={{ width: "100%" }}
+                    />
                   </div>
                   <div>
-                    <label style={{ display: "block", fontSize: "0.6rem", color: "var(--bb-gray)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.25rem", fontWeight: 600 }}>
+                    <label
+                      style={{
+                        display: "block",
+                        fontSize: "0.6rem",
+                        color: "var(--bb-gray)",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.06em",
+                        marginBottom: "0.25rem",
+                        fontWeight: 600,
+                      }}
+                    >
                       YEAR
                     </label>
-                    <select value={year} onChange={(e) => setYear(e.target.value)} style={{ width: "100%" }}>
+                    <select
+                      value={year}
+                      onChange={(e) => setYear(e.target.value)}
+                      style={{ width: "100%" }}
+                    >
                       <option value="">Select Year</option>
-                      {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+                      {YEARS.map((y) => (
+                        <option key={y} value={y}>
+                          {y}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 </div>
@@ -338,22 +642,59 @@ export default function SearchPage() {
 
               {tab === "advocate" && (
                 <div style={{ marginBottom: "0.75rem" }}>
-                  <label style={{ display: "block", fontSize: "0.6rem", color: "var(--bb-gray)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.25rem", fontWeight: 600 }}>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "0.6rem",
+                      color: "var(--bb-gray)",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.06em",
+                      marginBottom: "0.25rem",
+                      fontWeight: 600,
+                    }}
+                  >
                     ADVOCATE NAME
                   </label>
-                  <input type="text" value={advocateName} onChange={(e) => setAdvocateName(e.target.value)}
-                    placeholder="Enter advocate name (min 3 chars)" style={{ width: "100%" }} />
+                  <input
+                    type="text"
+                    value={advocateName}
+                    onChange={(e) => setAdvocateName(e.target.value)}
+                    placeholder="Enter advocate name (min 3 chars)"
+                    style={{ width: "100%" }}
+                  />
                 </div>
               )}
 
               {tab === "cnr" && (
                 <div style={{ marginBottom: "0.75rem" }}>
-                  <label style={{ display: "block", fontSize: "0.6rem", color: "var(--bb-gray)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.25rem", fontWeight: 600 }}>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "0.6rem",
+                      color: "var(--bb-gray)",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.06em",
+                      marginBottom: "0.25rem",
+                      fontWeight: 600,
+                    }}
+                  >
                     CNR NUMBER
                   </label>
-                  <input type="text" value={cnrNumber} onChange={(e) => setCnrNumber(e.target.value.toUpperCase())}
-                    placeholder="e.g. APHC010673172022 (16 chars)" style={{ width: "100%" }} maxLength={16} />
-                  <p style={{ fontSize: "0.55rem", color: "var(--bb-gray-dim)", marginTop: "0.2rem" }}>
+                  <input
+                    type="text"
+                    value={cnrNumber}
+                    onChange={(e) => setCnrNumber(e.target.value.toUpperCase())}
+                    placeholder="e.g. APHC010673172022 (16 chars)"
+                    style={{ width: "100%" }}
+                    maxLength={16}
+                  />
+                  <p
+                    style={{
+                      fontSize: "0.55rem",
+                      color: "var(--bb-gray-dim)",
+                      marginTop: "0.2rem",
+                    }}
+                  >
                     16-character unique case number from eCourts
                   </p>
                 </div>
@@ -363,7 +704,11 @@ export default function SearchPage() {
                 type="submit"
                 disabled={loading}
                 className="bb-btn bb-btn-primary"
-                style={{ width: "100%", opacity: loading ? 0.6 : 1, cursor: loading ? "not-allowed" : "pointer" }}
+                style={{
+                  width: "100%",
+                  opacity: loading ? 0.6 : 1,
+                  cursor: loading ? "not-allowed" : "pointer",
+                }}
               >
                 {loading ? "[SEARCHING...]" : "[SEARCH]"}
               </button>
@@ -374,28 +719,85 @@ export default function SearchPage() {
         {/* Loading */}
         {loading && (
           <div className="bb-panel">
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "3rem", gap: "0.5rem" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "3rem",
+                gap: "0.5rem",
+              }}
+            >
               <span className="live-dot" />
-              <span style={{ color: "var(--bb-amber)", fontSize: "0.78rem", letterSpacing: "0.05em" }}>
-                SEARCHING COURTS... SOLVING CAPTCHA... THIS MAY TAKE 10-15 SECONDS
+              <span
+                style={{
+                  color: "var(--bb-amber)",
+                  fontSize: "0.78rem",
+                  letterSpacing: "0.05em",
+                }}
+              >
+                SEARCHING COURTS... SOLVING CAPTCHA... THIS CAN TAKE UP TO 45
+                SECONDS
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Error */}
+        {error && !loading && (
+          <div className="bb-panel">
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "1.5rem",
+                gap: "0.5rem",
+              }}
+            >
+              <span
+                style={{
+                  color: "var(--bb-red)",
+                  fontSize: "0.72rem",
+                  letterSpacing: "0.04em",
+                }}
+              >
+                ERROR: {error}
               </span>
             </div>
           </div>
         )}
 
         {/* Results */}
-        {searched && !loading && (
+        {searched && !loading && !error && (
           <div className="bb-panel">
             {results.length === 0 ? (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "3rem", flexDirection: "column", gap: "0.25rem" }}>
-                <span style={{ color: "var(--bb-gray)", fontSize: "0.78rem" }}>NO RESULTS</span>
-                <span style={{ color: "var(--bb-gray-dim)", fontSize: "0.6rem" }}>Try a different search term</span>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "3rem",
+                  flexDirection: "column",
+                  gap: "0.25rem",
+                }}
+              >
+                <span style={{ color: "var(--bb-gray)", fontSize: "0.78rem" }}>
+                  NO RESULTS
+                </span>
+                <span
+                  style={{ color: "var(--bb-gray-dim)", fontSize: "0.6rem" }}
+                >
+                  Try a different search term
+                </span>
               </div>
             ) : (
               <>
                 <div className="bb-panel-header">
                   <span className="bb-panel-title">RESULTS</span>
-                  <span style={{ fontSize: "0.6rem", color: "var(--bb-gray)" }}>{results.length} CASES</span>
+                  <span style={{ fontSize: "0.6rem", color: "var(--bb-gray)" }}>
+                    {results.length} CASES
+                  </span>
                 </div>
                 <div style={{ overflowX: "auto" }}>
                   <table className="bb-table">
@@ -412,41 +814,91 @@ export default function SearchPage() {
                       {results.map((r, i) => (
                         <tr key={i}>
                           <td>
-                            <span style={{ fontSize: "0.7rem", fontWeight: 600, color: "var(--bb-amber)" }}>
+                            <span
+                              style={{
+                                fontSize: "0.7rem",
+                                fontWeight: 600,
+                                color: "var(--bb-amber)",
+                              }}
+                            >
                               {r.courtType}
                             </span>
                           </td>
                           <td style={{ maxWidth: "300px" }}>
-                            <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            <div
+                              style={{
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
                               {r.petitioner && r.respondent
                                 ? `${r.petitioner} vs ${r.respondent}`
-                                : r.caseTitle || `${r.caseNumber}/${r.caseYear}`}
+                                : r.caseTitle ||
+                                  `${r.caseNumber}/${r.caseYear}`}
                             </div>
-                            <div style={{ fontSize: "0.6rem", color: "var(--bb-gray)" }}>{r.courtName}</div>
+                            <div
+                              style={{
+                                fontSize: "0.6rem",
+                                color: "var(--bb-gray)",
+                              }}
+                            >
+                              {r.courtName}
+                            </div>
                           </td>
                           <td style={{ whiteSpace: "nowrap" }}>
                             {r.caseType} {r.caseNumber}/{r.caseYear}
                           </td>
                           <td>
-                            <span style={{ fontSize: "0.68rem", color: r.status === "Disposed" || r.status === "DISPOSED" ? "var(--bb-green)" : r.status === "Pending" || r.status === "PENDING" ? "var(--bb-amber)" : "var(--bb-gray)" }}>
+                            <span
+                              style={{
+                                fontSize: "0.68rem",
+                                color:
+                                  r.status === "Disposed" ||
+                                  r.status === "DISPOSED"
+                                    ? "var(--bb-green)"
+                                    : r.status === "Pending" ||
+                                        r.status === "PENDING"
+                                      ? "var(--bb-amber)"
+                                      : "var(--bb-gray)",
+                              }}
+                            >
                               {r.status || "-"}
                             </span>
                           </td>
                           <td style={{ textAlign: "right" }}>
                             {trackedCases.has(r.caseNumber + r.caseYear) ? (
-                          <span style={{ fontSize: "0.6rem", color: "var(--bb-green)", fontWeight: 600, letterSpacing: "0.05em" }}>
-                            TRACKED ✓
-                          </span>
-                        ) : (
-                          <button
-                              onClick={() => trackCase(r)}
-                              disabled={trackingId === r.caseNumber + r.caseYear}
-                              className="bb-btn bb-btn-primary"
-                              style={{ padding: "0.25rem 0.6rem", fontSize: "0.6rem", opacity: trackingId === r.caseNumber + r.caseYear ? 0.6 : 1 }}
-                            >
-                              {trackingId === r.caseNumber + r.caseYear ? "[...]" : "[+ TRACK]"}
-                            </button>
-                        )}
+                              <span
+                                style={{
+                                  fontSize: "0.6rem",
+                                  color: "var(--bb-green)",
+                                  fontWeight: 600,
+                                  letterSpacing: "0.05em",
+                                }}
+                              >
+                                TRACKED ✓
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => trackCase(r)}
+                                disabled={
+                                  trackingId === r.caseNumber + r.caseYear
+                                }
+                                className="bb-btn bb-btn-primary"
+                                style={{
+                                  padding: "0.25rem 0.6rem",
+                                  fontSize: "0.6rem",
+                                  opacity:
+                                    trackingId === r.caseNumber + r.caseYear
+                                      ? 0.6
+                                      : 1,
+                                }}
+                              >
+                                {trackingId === r.caseNumber + r.caseYear
+                                  ? "[...]"
+                                  : "[+ TRACK]"}
+                              </button>
+                            )}
                           </td>
                         </tr>
                       ))}

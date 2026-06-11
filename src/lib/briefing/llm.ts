@@ -19,9 +19,15 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { GeneratedBriefing, LLMProvider } from "./types";
 
 function getProvider(): LLMProvider {
-  const raw = (process.env.LLM_PROVIDER || "gemini").toLowerCase();
+  const raw = (process.env.LLM_PROVIDER || "").toLowerCase();
   if (raw === "gemini" || raw === "anthropic" || raw === "ollama") return raw;
-  return "gemini";
+  // No explicit choice — pick the first provider whose creds are configured,
+  // so the briefing never dies on a missing default key when another
+  // provider is ready to go.
+  if (process.env.GEMINI_API_KEY) return "gemini";
+  if (process.env.ANTHROPIC_API_KEY) return "anthropic";
+  if (process.env.OLLAMA_URL) return "ollama";
+  return "gemini"; // downstream throws a clear "GEMINI_API_KEY not set"
 }
 
 async function generateGemini(prompt: string): Promise<GeneratedBriefing> {

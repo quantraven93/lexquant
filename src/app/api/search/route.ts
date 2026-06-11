@@ -3,6 +3,37 @@ import { courtService } from "@/lib/courts/court-service";
 import { NextResponse } from "next/server";
 import type { CourtType } from "@/lib/courts/types";
 
+// Court scrapers chain many fetches + up to 3 CAPTCHA attempts; without a
+// ceiling a single search can run for minutes and the UI spins forever.
+export const maxDuration = 60;
+
+const SEARCH_DEADLINE_MS = 45_000;
+
+class SearchDeadlineError extends Error {
+  constructor() {
+    super("deadline");
+  }
+}
+
+function withDeadline<T>(promise: Promise<T>): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new SearchDeadlineError()), SEARCH_DEADLINE_MS),
+    ),
+  ]);
+}
+
+function timeoutResponse() {
+  return NextResponse.json(
+    {
+      error:
+        "Court search timed out after 45 seconds. The court portal may be slow or down — pick a specific court instead of All Courts, or retry.",
+    },
+    { status: 504 },
+  );
+}
+
 export async function GET(request: Request) {
   const supabase = await createClient();
   const {
@@ -29,13 +60,19 @@ export async function GET(request: Request) {
   try {
     switch (searchType) {
       case "party": {
-        if (query.length < 3) return NextResponse.json({ error: "Min 3 chars for party search" }, { status: 400 });
-        const results = await courtService.searchByPartyName({
-          partyName: query,
-          courtType: courtType || undefined,
-          stateCode: stateCode || undefined,
-          year: year || undefined,
-        });
+        if (query.length < 3)
+          return NextResponse.json(
+            { error: "Min 3 chars for party search" },
+            { status: 400 },
+          );
+        const results = await withDeadline(
+          courtService.searchByPartyName({
+            partyName: query,
+            courtType: courtType || undefined,
+            stateCode: stateCode || undefined,
+            year: year || undefined,
+          }),
+        );
         return NextResponse.json({ results });
       }
 
@@ -50,7 +87,9 @@ export async function GET(request: Request) {
           courtCode: courtComplex?.split("@")[0] || undefined,
         };
         console.log("[Search] Case number lookup:", identifier);
-        const caseStatus = await courtService.getCaseStatus(identifier);
+        const caseStatus = await withDeadline(
+          courtService.getCaseStatus(identifier),
+        );
 
         // Determine court name from params
         let courtName = "District Court";
@@ -59,38 +98,53 @@ export async function GET(request: Request) {
 
         if (caseStatus) {
           return NextResponse.json({
-            results: [{
-              caseTitle: caseStatus.caseTitle,
-              caseNumber: query,
-              caseYear: year || "",
-              caseType: caseType || "",
-              courtType: courtType || "DC",
-              courtName,
-              status: caseStatus.currentStatus,
-              petitioner: caseStatus.petitioner,
-              respondent: caseStatus.respondent,
-              cnrNumber: caseStatus.rawData?.cnrNumber,
-            }],
+            results: [
+              {
+                caseTitle: caseStatus.caseTitle,
+                caseNumber: query,
+                caseYear: year || "",
+                caseType: caseType || "",
+                courtType: courtType || "DC",
+                courtName,
+                status: caseStatus.currentStatus,
+                petitioner: caseStatus.petitioner,
+                respondent: caseStatus.respondent,
+                cnrNumber: caseStatus.rawData?.cnrNumber,
+              },
+            ],
           });
         }
         return NextResponse.json({ results: [] });
       }
 
       case "advocate": {
-        if (query.length < 3) return NextResponse.json({ error: "Min 3 chars for advocate search" }, { status: 400 });
+        if (query.length < 3)
+          return NextResponse.json(
+            { error: "Min 3 chars for advocate search" },
+            { status: 400 },
+          );
         // Advocate search — use party name search as fallback for now
         // TODO: Wire HC qs_civil_advocate.php endpoint
-        const results = await courtService.searchByPartyName({
-          partyName: query,
-          courtType: courtType || undefined,
-          stateCode: stateCode || undefined,
-          year: year || undefined,
+        const results = await withDeadline(
+          courtService.searchByPartyName({
+            partyName: query,
+            courtType: courtType || undefined,
+            stateCode: stateCode || undefined,
+            year: year || undefined,
+          }),
+        );
+        return NextResponse.json({
+          results,
+          note: "Advocate search uses party name as fallback",
         });
-        return NextResponse.json({ results, note: "Advocate search uses party name as fallback" });
       }
 
       case "cnr": {
-        if (query.length < 10) return NextResponse.json({ error: "CNR must be at least 10 chars" }, { status: 400 });
+        if (query.length < 10)
+          return NextResponse.json(
+            { error: "CNR must be at least 10 chars" },
+            { status: 400 },
+          );
         // CNR lookup
         const identifier = {
           courtType: (courtType || "DC") as CourtType,
@@ -99,30 +153,44 @@ export async function GET(request: Request) {
           caseYear: "",
           cnrNumber: query.toUpperCase(),
         };
-        const caseStatus = await courtService.getCaseStatus(identifier);
+        const caseStatus = await withDeadline(
+          courtService.getCaseStatus(identifier),
+        );
         if (caseStatus) {
           return NextResponse.json({
-            results: [{
-              caseTitle: caseStatus.caseTitle,
-              caseNumber: query,
-              caseYear: "",
-              caseType: "",
-              courtType: courtType || "DC",
-              courtName: "eCourts",
-              cnrNumber: query.toUpperCase(),
-              status: caseStatus.currentStatus,
-              petitioner: caseStatus.petitioner,
-              respondent: caseStatus.respondent,
-            }],
+            results: [
+              {
+                caseTitle: caseStatus.caseTitle,
+                caseNumber: query,
+                caseYear: "",
+                caseType: "",
+                courtType: courtType || "DC",
+                courtName: "eCourts",
+                cnrNumber: query.toUpperCase(),
+                status: caseStatus.currentStatus,
+                petitioner: caseStatus.petitioner,
+                respondent: caseStatus.respondent,
+              },
+            ],
           });
         }
         return NextResponse.json({ results: [] });
       }
 
       default:
-        return NextResponse.json({ error: "Invalid search type" }, { status: 400 });
+        return NextResponse.json(
+          { error: "Invalid search type" },
+          { status: 400 },
+        );
     }
   } catch (error) {
+    if (error instanceof SearchDeadlineError) {
+      console.error(`[Search] Deadline hit (${SEARCH_DEADLINE_MS}ms):`, {
+        searchType,
+        courtType,
+      });
+      return timeoutResponse();
+    }
     console.error("Search error:", error);
     return NextResponse.json({ error: "Search failed" }, { status: 500 });
   }
