@@ -26,6 +26,10 @@ export const IK_COURTS = {
   madhyapradesh: "Madhya Pradesh High Court",
   punjab: "Punjab & Haryana High Court",
   jodhpur: "Rajasthan High Court — Jodhpur",
+  // IK spells the AP HC doctype 'amravati' (verified via IK facets,
+  // June 2026 — 'andhra' returns nothing for the post-2019 court).
+  amravati: "Andhra Pradesh High Court — Amaravati",
+  telangana: "Telangana High Court",
 } as const;
 
 export type IKCourtCode = keyof typeof IK_COURTS;

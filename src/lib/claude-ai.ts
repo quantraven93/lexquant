@@ -137,6 +137,44 @@ export async function summarizeOrder(
 }
 
 /**
+ * One-line "who vs whom, over what" digest for a judgment row. Used by
+ * the Live Digest so a scan of the panel reads like a wire feed. Returns
+ * "" on any failure — callers treat the line as optional.
+ */
+export async function generateIssueLine(input: {
+  title: string;
+  headline?: string | null;
+  courtName?: string | null;
+}): Promise<string> {
+  try {
+    const client = getClient();
+    const response = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 60,
+      messages: [
+        {
+          role: "user",
+          content: `From this Indian judgment's title and search snippet, write ONE line (maximum 18 words) stating the core issue decided or relief sought — e.g. "Anticipatory bail in NDPS commercial-quantity case refused" or "Writ against land resurvey order; gazette notification stayed". No party names (the title already shows them), no citations, no quotes, no trailing period.
+
+Title: ${input.title}
+Court: ${input.courtName || "unknown"}
+Snippet: ${(input.headline || "").slice(0, 600)}`,
+        },
+      ],
+    });
+    const text =
+      response.content[0]?.type === "text" ? response.content[0].text : "";
+    return text
+      .trim()
+      .replace(/^["']|["']$/g, "")
+      .slice(0, 160);
+  } catch (error) {
+    console.error("[Claude AI] issue line failed:", error);
+    return "";
+  }
+}
+
+/**
  * Generate an AI summary of a case based on its data.
  */
 export async function summarizeCase(caseData: {

@@ -15,6 +15,7 @@ import {
 import { ingestNews } from "@/lib/news/ingest";
 import { embedJudgment } from "@/lib/embed/store";
 import { generateMorningBriefings } from "@/lib/briefing/build";
+import { generateIssueLine, isAIConfigured } from "@/lib/claude-ai";
 
 export const maxDuration = 60;
 
@@ -32,6 +33,8 @@ const CHUNK_BACKFILL_TIME_BUDGET_MS = 40_000;
 
 const DEFAULT_COURTS: IKCourtCode[] = [
   "supremecourt",
+  "amravati",
+  "telangana",
   "bombay",
   "delhi",
   "chennai",
@@ -101,6 +104,53 @@ async function ingestJudgments() {
     duration,
     range: { from: fromStr, to: toStr },
   };
+}
+
+interface IssueLineResult {
+  generated: number;
+  failed: number;
+  pendingSeen: number;
+}
+
+// One-line "core issue" digests for freshly ingested judgments, newest
+// first. Returns {skipped} when migration 011 (issue_line column) isn't
+// applied yet — the digest then simply shows titles only.
+async function generateIssueLines(
+  remaining: () => number,
+): Promise<IssueLineResult | { skipped: string }> {
+  const supabase = createAdminClient();
+  const { data: pending, error } = await supabase
+    .from("judgments")
+    .select("id, title, headline, court_name")
+    .is("issue_line", null)
+    .order("ingested_at", { ascending: false, nullsFirst: false })
+    .limit(25);
+  if (error) {
+    console.warn(`[IssueLines] query failed: ${error.message}`);
+    return { skipped: `query failed: ${error.message}` };
+  }
+
+  let generated = 0;
+  let failed = 0;
+  for (const j of pending || []) {
+    if (remaining() < 8_000) break;
+    const line = await generateIssueLine({
+      title: j.title,
+      headline: j.headline,
+      courtName: j.court_name,
+    });
+    if (!line) {
+      failed++;
+      continue;
+    }
+    const { error: upErr } = await supabase
+      .from("judgments")
+      .update({ issue_line: line })
+      .eq("id", j.id);
+    if (upErr) failed++;
+    else generated++;
+  }
+  return { generated, failed, pendingSeen: (pending || []).length };
 }
 
 interface ChunkBackfillResult {
@@ -223,6 +273,23 @@ export async function GET(request: Request) {
       }
     }
 
+    // One-liner issue digests for the freshest judgments (needs
+    // ANTHROPIC_API_KEY + migration 011; both absent → clean skip).
+    let issueLines: IssueLineResult | { skipped: string };
+    if (!isAIConfigured()) {
+      issueLines = { skipped: "AI not configured" };
+    } else if (remaining() < 15_000) {
+      issueLines = { skipped: `low budget: ${remaining()}ms left` };
+    } else {
+      try {
+        issueLines = await generateIssueLines(remaining);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error("[IssueLines] failed inside cron:", msg);
+        issueLines = { skipped: `error: ${msg}` };
+      }
+    }
+
     // Chunk backfill — drains the embed backlog for judgments whose
     // chunks_at is still NULL. Bounded by tid count + wall-clock so it
     // never blows the lambda budget; remaining backlog rolls forward.
@@ -244,7 +311,7 @@ export async function GET(request: Request) {
       }
     }
 
-    return NextResponse.json({ judgments, news, briefing, chunks });
+    return NextResponse.json({ judgments, news, briefing, issueLines, chunks });
   } catch (err) {
     console.error("[Judgments] Fatal:", err);
     return NextResponse.json(

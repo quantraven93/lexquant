@@ -1106,6 +1106,46 @@ select option {
   letter-spacing: 0.08em;
   color: var(--bb-gray);
 }
+.bb-digest-issue {
+  display: block;
+  font-family: var(--bb-font);
+  font-size: 0.6rem;
+  color: var(--bb-amber-dim);
+  letter-spacing: 0.02em;
+  margin-top: 0.12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bb-board-row {
+  display: grid;
+  grid-template-columns: 64px 72px 1fr auto;
+  gap: 0.6rem;
+  align-items: center;
+  padding: 0.38rem 0.8rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+.bb-board-court {
+  font-family: var(--bb-font);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--bb-amber);
+}
+.bb-board-item {
+  font-family: var(--bb-font);
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--bb-white);
+}
+.bb-board-coram {
+  font-family: var(--bb-font);
+  font-size: 0.6rem;
+  color: var(--bb-gray);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .bb-cause-section-label {
   padding: 0.45rem 0.8rem 0.25rem;
   font-family: var(--bb-font);
