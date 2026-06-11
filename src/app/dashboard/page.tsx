@@ -148,10 +148,10 @@ export default function DashboardPage() {
                 background: "var(--bb-border)",
               }}
             >
-              <div style={{ flex: "1.2 1 0", minHeight: 0, display: "flex" }}>
+              <div style={{ flex: "1.2 1 0", minHeight: 0, display: "grid" }}>
                 <CauseList />
               </div>
-              <div style={{ flex: "1 1 0", minHeight: 0, display: "flex" }}>
+              <div style={{ flex: "1 1 0", minHeight: 0, display: "grid" }}>
                 <DisplayBoard />
               </div>
             </div>
