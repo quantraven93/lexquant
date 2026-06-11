@@ -29,6 +29,11 @@ interface CaseData {
 export default function DashboardPage() {
   const [cases, setCases] = useState<CaseData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [watchlistCount, setWatchlistCount] = useState(0);
+  const [todayCounts, setTodayCounts] = useState<{
+    judgments: number;
+    news: number;
+  } | null>(null);
 
   useEffect(() => {
     fetch("/api/cases")
@@ -38,6 +43,14 @@ export default function DashboardPage() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
+    fetch("/api/watchlist")
+      .then((r) => r.json())
+      .then((data) => setWatchlistCount((data.items || []).length))
+      .catch(() => {});
+    fetch("/api/health")
+      .then((r) => r.json())
+      .then((data) => setTodayCounts(data.today || null))
+      .catch(() => {});
   }, []);
 
   const totalCases = cases.length;
@@ -97,7 +110,9 @@ export default function DashboardPage() {
           upcomingThisWeek={upcomingHearings}
           hearingsToday={hearingsToday}
           disposed={disposedCases}
-          watchlist={0}
+          watchlist={watchlistCount}
+          newJudgmentsToday={todayCounts?.judgments}
+          newNewsToday={todayCounts?.news}
         />
 
         {loading ? (
