@@ -1106,6 +1106,16 @@ select option {
   letter-spacing: 0.08em;
   color: var(--bb-gray);
 }
+.bb-cause-section-label {
+  padding: 0.45rem 0.8rem 0.25rem;
+  font-family: var(--bb-font);
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--bb-amber-dim);
+  border-bottom: 1px solid var(--bb-border);
+  background: var(--bb-panel-alt);
+}
 
 /* ---- SideNav (pass 3) ---- */
 
