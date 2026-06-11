@@ -90,7 +90,7 @@ export function AIBriefingStrip() {
               letterSpacing: "0.06em",
             }}
           >
-            No briefing yet · the morning cron runs daily at 06:00 IST.
+            No briefing yet · the morning cron runs daily at 06:30 IST.
           </div>
         )}
       </div>

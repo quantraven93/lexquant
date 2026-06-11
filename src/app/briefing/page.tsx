@@ -101,7 +101,7 @@ export default function BriefingPage() {
                 letterSpacing: "0.06em",
               }}
             >
-              No briefing yet · the morning cron generates one daily at 06:00
+              No briefing yet · the morning cron generates one daily at 06:30
               IST.
             </div>
           ) : (
