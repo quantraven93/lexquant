@@ -1,34 +1,51 @@
 import { NextResponse } from "next/server";
 import { fetchDisplayBoard } from "@/lib/courts/aphc-displayboard";
+import { fetchSciDisplayBoard } from "@/lib/courts/sci-displayboard";
 
 /**
- * Live AP High Court display board, proxied for the dashboard panel.
- * The upstream JSP refreshes every 60s; cache for 55s at the edge so a
- * polling panel never hammers the court's server.
+ * Live court display boards (AP High Court + Supreme Court), proxied
+ * for the dashboard panel. Both upstreams refresh every ~60s; cache for
+ * 55s at the edge so polling panels never hammer the court servers.
+ * Each board fails independently — one being down doesn't blank the
+ * other.
  */
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  try {
-    const rows = await fetchDisplayBoard();
-    const inSession = rows.filter((r) => r.status !== "not_in_session");
+  const [aphc, sci] = await Promise.allSettled([
+    fetchDisplayBoard(),
+    fetchSciDisplayBoard(),
+  ]);
+
+  const aphcRows = aphc.status === "fulfilled" ? aphc.value : [];
+  const sciRows = sci.status === "fulfilled" ? sci.value : [];
+
+  if (aphc.status === "rejected" && sci.status === "rejected") {
     return NextResponse.json(
       {
-        rows,
-        inSession: inSession.length,
-        fetchedAt: new Date().toISOString(),
+        error: `both boards unavailable: ${String(aphc.reason)} | ${String(sci.reason)}`,
       },
-      {
-        headers: {
-          "Cache-Control": "s-maxage=55, stale-while-revalidate=30",
-        },
-      },
-    );
-  } catch (e) {
-    return NextResponse.json(
-      { error: `display board unavailable: ${String(e)}` },
       { status: 502 },
     );
   }
+
+  return NextResponse.json(
+    {
+      aphc: {
+        rows: aphcRows,
+        error: aphc.status === "rejected" ? String(aphc.reason) : null,
+      },
+      sci: {
+        rows: sciRows,
+        error: sci.status === "rejected" ? String(sci.reason) : null,
+      },
+      fetchedAt: new Date().toISOString(),
+    },
+    {
+      headers: {
+        "Cache-Control": "s-maxage=55, stale-while-revalidate=30",
+      },
+    },
+  );
 }
