@@ -36,6 +36,7 @@ export function TopBar() {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [fetchFailed, setFetchFailed] = useState(false);
   const [groups, setGroups] = useState<Record<string, SearchHit[]>>({});
   const [activeIdx, setActiveIdx] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -91,12 +92,15 @@ export function TopBar() {
         const r = await fetch(`/api/search/global?q=${encodeURIComponent(q)}`);
         if (!r.ok) {
           setGroups({});
+          setFetchFailed(true);
         } else {
           const data = (await r.json()) as SearchResponse;
           setGroups(data.groups || {});
+          setFetchFailed(false);
         }
       } catch {
         setGroups({});
+        setFetchFailed(true);
       } finally {
         setLoading(false);
       }
@@ -185,6 +189,11 @@ export function TopBar() {
                   let cursor = 0;
                   return (
                     <>
+                      {fetchFailed ? (
+                        <div className="bb-search-empty">
+                          search backend unreachable — keep typing to retry
+                        </div>
+                      ) : null}
                       {/* Ask AI is always first */}
                       <div className="bb-search-section">
                         <div className="bb-search-section-label">Ask AI</div>
