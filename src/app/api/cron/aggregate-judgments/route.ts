@@ -14,8 +14,15 @@ import {
 } from "@/lib/courts/ik-judgments";
 import { ingestNews } from "@/lib/news/ingest";
 import { embedJudgment } from "@/lib/embed/store";
+import { generateMorningBriefings } from "@/lib/briefing/build";
 
 export const maxDuration = 60;
+
+// Route-level wall-clock guards: the briefing and chunk-backfill stages
+// only start if enough lambda budget remains after the ingest stages.
+const BRIEFING_MIN_REMAINING_MS = 20_000;
+const CHUNKS_MIN_REMAINING_MS = 10_000;
+const ROUTE_BUDGET_MS = 55_000;
 
 // Backfill bookkeeping — bound the loop both by tid count AND by wall-clock
 // so we never blow the lambda budget. The remaining backlog rolls over to
@@ -106,7 +113,9 @@ interface ChunkBackfillResult {
   durationMs: number;
 }
 
-async function backfillPendingChunks(): Promise<ChunkBackfillResult> {
+async function backfillPendingChunks(
+  budgetMs: number = CHUNK_BACKFILL_TIME_BUDGET_MS,
+): Promise<ChunkBackfillResult> {
   const startedAt = Date.now();
   const supabase = createAdminClient();
 
@@ -140,7 +149,7 @@ async function backfillPendingChunks(): Promise<ChunkBackfillResult> {
   let bailedOnTime = false;
 
   for (const tid of tids) {
-    if (Date.now() - startedAt >= CHUNK_BACKFILL_TIME_BUDGET_MS) {
+    if (Date.now() - startedAt >= budgetMs) {
       bailedOnTime = true;
       break;
     }
@@ -179,6 +188,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const routeStart = Date.now();
+  const remaining = () => ROUTE_BUDGET_MS - (Date.now() - routeStart);
+
   try {
     const judgments = await ingestJudgments();
     // News ingest runs in the same cron to stay within Hobby tier's
@@ -192,6 +204,25 @@ export async function GET(request: Request) {
       news = { error: msg };
     }
 
+    // Morning briefing — runs here (06:30 IST) right after ingest so it
+    // covers the judgments fetched seconds earlier. Lives in this cron
+    // because Hobby allows only 2 crons and the GH-Actions path 401s on
+    // a CRON_SECRET that drifted from Vercel's.
+    let briefing:
+      | Awaited<ReturnType<typeof generateMorningBriefings>>
+      | { skipped: string };
+    if (remaining() < BRIEFING_MIN_REMAINING_MS) {
+      briefing = { skipped: `low budget: ${remaining()}ms left` };
+    } else {
+      try {
+        briefing = await generateMorningBriefings();
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error("[Briefing] Failed inside judgments cron:", msg);
+        briefing = { skipped: `error: ${msg}` };
+      }
+    }
+
     // Chunk backfill — drains the embed backlog for judgments whose
     // chunks_at is still NULL. Bounded by tid count + wall-clock so it
     // never blows the lambda budget; remaining backlog rolls forward.
@@ -199,9 +230,13 @@ export async function GET(request: Request) {
     let chunks: ChunkBackfillResult | { skipped: string };
     if (!process.env.VOYAGE_API_KEY) {
       chunks = { skipped: "VOYAGE_API_KEY not set" };
+    } else if (remaining() < CHUNKS_MIN_REMAINING_MS) {
+      chunks = { skipped: `low budget: ${remaining()}ms left` };
     } else {
       try {
-        chunks = await backfillPendingChunks();
+        chunks = await backfillPendingChunks(
+          Math.min(CHUNK_BACKFILL_TIME_BUDGET_MS, Math.max(remaining(), 0)),
+        );
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         console.error("[Chunks] Backfill failed inside cron:", msg);
@@ -209,7 +244,7 @@ export async function GET(request: Request) {
       }
     }
 
-    return NextResponse.json({ judgments, news, chunks });
+    return NextResponse.json({ judgments, news, briefing, chunks });
   } catch (err) {
     console.error("[Judgments] Fatal:", err);
     return NextResponse.json(
