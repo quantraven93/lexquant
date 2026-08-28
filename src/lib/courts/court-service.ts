@@ -8,10 +8,10 @@ import type {
 } from "./types";
 
 class CourtService {
-  async getCaseStatus(
-    identifier: CaseIdentifier
-  ): Promise<CaseStatus | null> {
-    // For SC cases, use SC scraper (Claude Vision CAPTCHA)
+  async getCaseStatus(identifier: CaseIdentifier): Promise<CaseStatus | null> {
+    // SC cases resolve through the SC scraper alone. ecourts.gov.in does not
+    // carry sci.gov.in matters, so falling through to it on an SC failure
+    // returned a different court's case parsed as this one.
     if (identifier.courtType === "SC") {
       try {
         const result = await scProvider.getCaseStatus(identifier);
@@ -19,6 +19,17 @@ class CourtService {
       } catch (error) {
         console.error("[CourtService] SC scraper failed:", error);
       }
+
+      if (identifier.cnrNumber && scProvider.getCaseByCNR) {
+        try {
+          const result = await scProvider.getCaseByCNR(identifier.cnrNumber);
+          if (result) return result;
+        } catch (error) {
+          console.error("[CourtService] SC CNR lookup failed:", error);
+        }
+      }
+
+      return null;
     }
 
     // For HC/DC/NCLT cases, use eCourts scraper
@@ -30,19 +41,10 @@ class CourtService {
     }
 
     // If CNR number available, try CNR lookup
-    if (identifier.cnrNumber) {
+    if (identifier.cnrNumber && ecourtsProvider.getCaseByCNR) {
       try {
-        if (identifier.courtType === "SC" && scProvider.getCaseByCNR) {
-          const result = await scProvider.getCaseByCNR(
-            identifier.cnrNumber
-          );
-          if (result) return result;
-        } else if (ecourtsProvider.getCaseByCNR) {
-          const result = await ecourtsProvider.getCaseByCNR(
-            identifier.cnrNumber
-          );
-          if (result) return result;
-        }
+        const result = await ecourtsProvider.getCaseByCNR(identifier.cnrNumber);
+        if (result) return result;
       } catch (error) {
         console.error("[CourtService] CNR lookup failed:", error);
       }
@@ -72,12 +74,12 @@ class CourtService {
     if (!params.courtType || params.courtType === "SC") {
       try {
         console.log(
-          `[CourtService] Searching SC (sci.gov.in) for: "${params.partyName}"`
+          `[CourtService] Searching SC (sci.gov.in) for: "${params.partyName}"`,
         );
         const scResults = await scProvider.searchByPartyName(params);
         if (scResults.length > 0) {
           console.log(
-            `[CourtService] SC scraper returned ${scResults.length} results`
+            `[CourtService] SC scraper returned ${scResults.length} results`,
           );
           allResults.push(...scResults);
         } else {
@@ -98,12 +100,12 @@ class CourtService {
     ) {
       try {
         console.log(
-          `[CourtService] Searching eCourts (ecourts.gov.in) for: "${params.partyName}"`
+          `[CourtService] Searching eCourts (ecourts.gov.in) for: "${params.partyName}"`,
         );
         const ecResults = await ecourtsProvider.searchByPartyName(params);
         if (ecResults.length > 0) {
           console.log(
-            `[CourtService] eCourts returned ${ecResults.length} results`
+            `[CourtService] eCourts returned ${ecResults.length} results`,
           );
           allResults.push(...ecResults);
         } else {
@@ -115,7 +117,7 @@ class CourtService {
     }
 
     console.log(
-      `[CourtService] Total results from official sources: ${allResults.length}`
+      `[CourtService] Total results from official sources: ${allResults.length}`,
     );
     return allResults;
   }

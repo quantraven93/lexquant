@@ -6,12 +6,25 @@
  * 3. Detects changes (status, hearing date, new orders, judge changes)
  * 4. Creates case_update records and sends notifications
  * 5. Updates the case record with latest data
+ *
+ * Change detection and the column-tolerant row write are shared with the
+ * Vercel cron route via src/lib/courts/case-refresh.
+ *
+ * Exits non-zero when any case failed, so a broken pipeline shows red in
+ * Actions instead of logging "0 updated, 4 errors" under a green tick.
  */
 
 import { createClient } from "@supabase/supabase-js";
 import nodemailer from "nodemailer";
 import { scProvider } from "../src/lib/courts/sc-scraper";
 import { ecourtsProvider } from "../src/lib/courts/ecourts-scraper";
+import {
+  detectCaseChanges,
+  hasValue,
+  newColumnSupport,
+  updateCaseRow,
+  type TrackedCaseFields,
+} from "../src/lib/courts/case-refresh";
 import type { CaseStatus, CaseIdentifier } from "../src/lib/courts/types";
 
 const SUPABASE_URL = process.env.SUPABASE_URL!;
@@ -44,17 +57,10 @@ interface TrackedCase {
   judges: string | null;
 }
 
-interface ChangeDetected {
-  field: string;
-  updateType: string;
-  oldValue: string | null;
-  newValue: string;
-}
-
 // ---- Court API via Scrapers ----
 
 async function fetchCaseFromAPI(
-  tracked: TrackedCase
+  tracked: TrackedCase,
 ): Promise<CaseStatus | null> {
   const identifier: CaseIdentifier = {
     courtType: (tracked.court_type as CaseIdentifier["courtType"]) || "DC",
@@ -74,63 +80,9 @@ async function fetchCaseFromAPI(
   return await ecourtsProvider.getCaseStatus(identifier);
 }
 
-// ---- Change Detection ----
-
-function detectChanges(
-  tracked: TrackedCase,
-  fresh: CaseStatus
-): ChangeDetected[] {
-  const changes: ChangeDetected[] = [];
-
-  // Status change
-  if (fresh.currentStatus && fresh.currentStatus !== tracked.current_status) {
-    changes.push({
-      field: "current_status",
-      updateType: "status_change",
-      oldValue: tracked.current_status,
-      newValue: fresh.currentStatus,
-    });
-  }
-
-  // Next hearing date change
-  if (fresh.nextHearingDate && fresh.nextHearingDate !== tracked.next_hearing_date) {
-    changes.push({
-      field: "next_hearing_date",
-      updateType: "hearing_date_change",
-      oldValue: tracked.next_hearing_date,
-      newValue: fresh.nextHearingDate,
-    });
-  }
-
-  // New order detected
-  if (fresh.lastOrderDate && fresh.lastOrderDate !== tracked.last_order_date) {
-    changes.push({
-      field: "last_order_date",
-      updateType: "new_order",
-      oldValue: tracked.last_order_date,
-      newValue: `New order on ${fresh.lastOrderDate}: ${fresh.lastOrderSummary || ""}`,
-    });
-  }
-
-  // Judge/bench change
-  if (fresh.judges && fresh.judges !== tracked.judges) {
-    changes.push({
-      field: "judges",
-      updateType: "judge_change",
-      oldValue: tracked.judges,
-      newValue: fresh.judges,
-    });
-  }
-
-  return changes;
-}
-
 // ---- Notifications ----
 
-async function sendTelegram(
-  chatId: string,
-  message: string
-): Promise<boolean> {
+async function sendTelegram(chatId: string, message: string): Promise<boolean> {
   if (!TELEGRAM_BOT_TOKEN) return false;
   try {
     const resp = await fetch(
@@ -144,7 +96,7 @@ async function sendTelegram(
           parse_mode: "HTML",
           disable_web_page_preview: true,
         }),
-      }
+      },
     );
     const data = await resp.json();
     return data.ok === true;
@@ -156,7 +108,7 @@ async function sendTelegram(
 async function sendEmailNotification(
   to: string,
   subject: string,
-  html: string
+  html: string,
 ): Promise<boolean> {
   if (!GMAIL_USER || !GMAIL_APP_PASSWORD) return false;
   try {
@@ -180,7 +132,9 @@ async function notifyUser(
   userId: string,
   caseId: string,
   caseTitle: string,
-  change: ChangeDetected
+  // Structural subset of CaseChange so the hearing reminder, which is not a
+  // detected change, can reuse the same notifier.
+  change: { type: string; oldValue: string | null; newValue: string },
 ): Promise<void> {
   const { data: profile } = await supabase
     .from("profiles")
@@ -190,7 +144,7 @@ async function notifyUser(
 
   if (!profile) return;
 
-  const label = change.updateType.replace(/_/g, " ").toUpperCase();
+  const label = change.type.replace(/_/g, " ").toUpperCase();
 
   if (profile.telegram_alerts && profile.telegram_chat_id) {
     const msg =
@@ -256,17 +210,11 @@ async function checkUpcomingHearings(): Promise<void> {
 
     if (existingAlert?.length) continue;
 
-    await notifyUser(
-      c.user_id,
-      c.id,
-      c.case_title || c.case_number,
-      {
-        field: "next_hearing_date",
-        updateType: "listing",
-        oldValue: null,
-        newValue: `Hearing scheduled for ${c.next_hearing_date}`,
-      }
-    );
+    await notifyUser(c.user_id, c.id, c.case_title || c.case_number, {
+      type: "listing",
+      oldValue: null,
+      newValue: `Hearing scheduled for ${c.next_hearing_date}`,
+    });
   }
 }
 
@@ -296,27 +244,35 @@ async function main() {
 
   let updated = 0;
   let errors = 0;
+  const columnSupport = newColumnSupport();
 
   for (const tracked of cases) {
     try {
       const fresh = await fetchCaseFromAPI(tracked as TrackedCase);
+      const now = new Date().toISOString();
+
       if (!fresh) {
         console.warn(`No data for case ${tracked.id}: null response`);
+        // Touch last_checked_at but NOT last_fetch_ok: the fetch failed.
+        await supabase
+          .from("cases")
+          .update({ last_checked_at: now })
+          .eq("id", tracked.id);
         errors++;
         continue;
       }
 
-      const changes = detectChanges(tracked as TrackedCase, fresh);
+      const changes = detectCaseChanges(tracked as TrackedCaseFields, fresh);
 
       if (changes.length > 0) {
         console.log(
-          `Changes detected for case ${tracked.case_title || tracked.id}: ${changes.map((c) => c.updateType).join(", ")}`
+          `Changes detected for case ${tracked.case_title || tracked.id}: ${changes.map((c) => c.type).join(", ")}`,
         );
 
         for (const change of changes) {
           await supabase.from("case_updates").insert({
             case_id: tracked.id,
-            update_type: change.updateType,
+            update_type: change.type,
             field_name: change.field,
             old_value: change.oldValue,
             new_value: change.newValue,
@@ -326,36 +282,39 @@ async function main() {
             tracked.user_id,
             tracked.id,
             tracked.case_title || tracked.case_number,
-            change
+            change,
           );
         }
 
-        await supabase
-          .from("cases")
-          .update({
-            current_status: fresh.currentStatus || tracked.current_status,
-            next_hearing_date:
-              fresh.nextHearingDate || tracked.next_hearing_date,
-            last_order_date:
-              fresh.lastOrderDate || tracked.last_order_date,
-            last_order_summary:
-              fresh.lastOrderSummary || tracked.last_order_summary,
-            petitioner: fresh.petitioner || tracked.petitioner,
-            respondent: fresh.respondent || tracked.respondent,
-            judges: fresh.judges || tracked.judges,
-            raw_data: fresh.rawData,
-            last_checked_at: new Date().toISOString(),
-            last_changed_at: new Date().toISOString(),
-          })
-          .eq("id", tracked.id);
-
         updated++;
-      } else {
-        await supabase
-          .from("cases")
-          .update({ last_checked_at: new Date().toISOString() })
-          .eq("id", tracked.id);
       }
+
+      // Write only what this fetch produced; an omitted column keeps its
+      // stored value, so a partial parse cannot blank a good field.
+      const caseUpdate: Record<string, unknown> = {
+        last_checked_at: now,
+        last_fetch_ok: now,
+      };
+      if (hasValue(fresh.currentStatus))
+        caseUpdate.current_status = fresh.currentStatus.trim();
+      if (hasValue(fresh.nextHearingDate))
+        caseUpdate.next_hearing_date = fresh.nextHearingDate.trim();
+      if (hasValue(fresh.lastOrderDate))
+        caseUpdate.last_order_date = fresh.lastOrderDate.trim();
+      if (hasValue(fresh.lastOrderSummary))
+        caseUpdate.last_order_summary = fresh.lastOrderSummary.trim();
+      if (hasValue(fresh.petitioner))
+        caseUpdate.petitioner = fresh.petitioner.trim();
+      if (hasValue(fresh.respondent))
+        caseUpdate.respondent = fresh.respondent.trim();
+      if (hasValue(fresh.judges)) caseUpdate.judges = fresh.judges.trim();
+      // Merge, don't replace: the manual-refresh route stores parsed
+      // hearings/orders here and this fetch usually carries only sourceHtml.
+      if (fresh.rawData)
+        caseUpdate.raw_data = { ...(tracked.raw_data ?? {}), ...fresh.rawData };
+      if (changes.length > 0) caseUpdate.last_changed_at = now;
+
+      await updateCaseRow(supabase, tracked.id, caseUpdate, columnSupport);
 
       // Rate limit: 1 second between API calls
       await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -368,8 +327,18 @@ async function main() {
   await checkUpcomingHearings();
 
   console.log(
-    `[${new Date().toISOString()}] Update complete: ${updated} updated, ${errors} errors out of ${cases.length} cases`
+    `[${new Date().toISOString()}] Update complete: ${updated} updated, ${errors} errors out of ${cases.length} cases`,
   );
+
+  // Any failure fails the run. With a portfolio this small a single silent
+  // failure is a quarter of the tracked matters, and it is exactly what let
+  // this job log "0 updated, 4 errors" under a green tick for 47 days.
+  if (errors > 0) {
+    console.error(
+      `${errors} of ${cases.length} cases failed to update — exiting non-zero.`,
+    );
+    process.exitCode = 1;
+  }
 }
 
 main().catch((err) => {
