@@ -4,6 +4,8 @@ import {
   IK_COURTS,
   IK_DOCSOURCE,
   attributeDocs,
+  parseFoundTotal,
+  IK_PAGE_SIZE,
   fetchJudgmentsForCourt,
   fetchJudgmentsForAllCourts,
   type IKCourtCode,
@@ -102,14 +104,17 @@ describe("fetchJudgmentsForCourt", () => {
     vi.unstubAllEnvs();
   });
 
-  function stubIK(pages: IKDoc[][]) {
+  function stubIK(pages: IKDoc[][], found?: string) {
     let call = 0;
-    const fetchMock = vi.fn(async () => ({
-      ok: true,
-      status: 200,
-      statusText: "OK",
-      json: async () => ({ docs: pages[call++] ?? [] }),
-    }));
+    const fetchMock = vi.fn(async () => {
+      const docs = pages[call++] ?? [];
+      return {
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        json: async () => ({ docs, found }),
+      };
+    });
     vi.stubGlobal("fetch", fetchMock);
     return fetchMock;
   }
@@ -124,9 +129,9 @@ describe("fetchJudgmentsForCourt", () => {
       toDate: new Date("2026-09-03"),
     });
 
-    expect(out).toHaveLength(3);
-    expect(out[0].court_code).toBe("bombay");
-    expect(out[0].court_name).toBe("Bombay High Court");
+    expect(out.records).toHaveLength(3);
+    expect(out.records[0].court_code).toBe("bombay");
+    expect(out.records[0].court_name).toBe("Bombay High Court");
   });
 
   it("throws rather than return foreign judgments under the wrong label", async () => {
@@ -170,7 +175,89 @@ describe("fetchJudgmentsForAllCourts", () => {
       toDate: new Date("2026-09-03"),
     });
 
-    expect(results.get("bombay")).toHaveLength(2);
-    expect(results.get("karnataka")).toEqual([]);
+    expect(results.get("bombay")?.records).toHaveLength(2);
+    expect(results.get("karnataka")?.records).toEqual([]);
+    // A court that threw must not read as "published nothing".
+    expect(results.get("karnataka")?.error).toMatch(/Gauhati High Court/);
+  });
+});
+
+describe("parseFoundTotal", () => {
+  it("reads the total out of IK's human string", () => {
+    expect(parseFoundTotal("1 - 10 of 732")).toBe(732);
+  });
+
+  it("handles a thousands separator", () => {
+    expect(parseFoundTotal("1 - 10 of 3,153")).toBe(3153);
+  });
+
+  it("reads an empty result set as zero, not unknown", () => {
+    expect(parseFoundTotal("No matching results")).toBe(0);
+  });
+
+  it("returns null rather than a confident zero on an unknown shape", () => {
+    // If IK changes this string, the ingest must report "unknown", never
+    // claim the court published nothing.
+    expect(parseFoundTotal("about a thousand")).toBeNull();
+    expect(parseFoundTotal(undefined)).toBeNull();
+  });
+});
+
+describe("fetchJudgmentsForCourt coverage reporting", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  function stub(docs: IKDoc[], found: string) {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        json: async () => ({ docs, found }),
+      })),
+    );
+  }
+
+  const window = {
+    fromDate: new Date("2026-09-01"),
+    toDate: new Date("2026-09-03"),
+  };
+
+  it("flags truncation when IK holds more than one page", async () => {
+    vi.stubEnv("IK_API_KEY", "test-key");
+    // Bombay's real numbers on 2026-09-07: 732 available, 10 taken.
+    stub(page("Bombay High Court", IK_PAGE_SIZE), "1 - 10 of 732");
+
+    const out = await fetchJudgmentsForCourt({ courtCode: "bombay", ...window });
+
+    expect(out.found).toBe(732);
+    expect(out.records).toHaveLength(IK_PAGE_SIZE);
+    expect(out.truncated).toBe(true);
+  });
+
+  it("does not flag truncation when the page holds everything", async () => {
+    vi.stubEnv("IK_API_KEY", "test-key");
+    stub(page("Telangana High Court", 4), "1 - 4 of 4");
+
+    const out = await fetchJudgmentsForCourt({
+      courtCode: "telangana",
+      ...window,
+    });
+
+    expect(out.found).toBe(4);
+    expect(out.truncated).toBe(false);
+  });
+
+  it("never claims truncation when the total could not be parsed", async () => {
+    vi.stubEnv("IK_API_KEY", "test-key");
+    stub(page("Delhi High Court", 3), "something unexpected");
+
+    const out = await fetchJudgmentsForCourt({ courtCode: "delhi", ...window });
+
+    expect(out.found).toBeNull();
+    expect(out.truncated).toBe(false);
   });
 });

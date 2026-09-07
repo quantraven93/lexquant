@@ -115,12 +115,50 @@ function stripBoldTags(s: string | null | undefined): string {
     .trim();
 }
 
+/** IK returns a fixed ten documents per page. */
+export const IK_PAGE_SIZE = 10;
+
+/**
+ * IK reports the size of the whole result set in `found`, as the human
+ * string "1 - 10 of 732" (or "No matching results"). Until now the ingest
+ * destructured this field and threw it away, so it had no idea it was
+ * taking ten of seven hundred.
+ *
+ * Returns null when the string is in a shape we do not recognise, so an IK
+ * format change reads as "unknown", never as a confident zero.
+ */
+export function parseFoundTotal(found: string | undefined): number | null {
+  if (!found) return null;
+  if (/no matching results/i.test(found)) return 0;
+  const match = found.match(/of\s+([\d,]+)\s*$/i);
+  if (!match) return null;
+  const n = Number.parseInt(match[1].replace(/,/g, ""), 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * What one court's fetch actually produced, as opposed to what it could
+ * have. `truncated` is the honest signal: the ingest is capped at
+ * `pages * IK_PAGE_SIZE`, so a busy court silently contributes a fraction
+ * of its judgments unless someone is looking at this number.
+ */
+export interface CourtFetchResult {
+  records: JudgmentRecord[];
+  /** IK's total hit count for the window; null if unparseable. */
+  found: number | null;
+  /** True when IK holds more for this window than we asked for. */
+  truncated: boolean;
+  pagesFetched: number;
+  /** Set when the court failed; records is then empty. */
+  error?: string;
+}
+
 export async function fetchJudgmentsForCourt(opts: {
   courtCode: IKCourtCode;
   fromDate: Date;
   toDate: Date;
   pages?: number;
-}): Promise<JudgmentRecord[]> {
+}): Promise<CourtFetchResult> {
   const { courtCode, fromDate, toDate, pages = 1 } = opts;
   const apiKey = process.env.IK_API_KEY;
 
@@ -138,6 +176,8 @@ export async function fetchJudgmentsForCourt(opts: {
   ].join(" ");
 
   const all: JudgmentRecord[] = [];
+  let found: number | null = null;
+  let pagesFetched = 0;
 
   for (let pagenum = 0; pagenum < pages; pagenum++) {
     const url = `${IK_API_BASE}/search/?formInput=${encodeURIComponent(
@@ -157,6 +197,9 @@ export async function fetchJudgmentsForCourt(opts: {
     }
 
     const data: { docs?: IKDoc[]; found?: string } = await response.json();
+    pagesFetched++;
+    // Only page 0 carries the total for the whole window.
+    if (pagenum === 0) found = parseFoundTotal(data.found);
     if (!data.docs?.length) break;
 
     const docs = attributeDocs(courtCode, data.docs);
@@ -181,10 +224,15 @@ export async function fetchJudgmentsForCourt(opts: {
       });
     }
 
-    if (docs.length < 10) break;
+    if (docs.length < IK_PAGE_SIZE) break;
   }
 
-  return all;
+  return {
+    records: all,
+    found,
+    truncated: found !== null && all.length < found,
+    pagesFetched,
+  };
 }
 
 export async function fetchJudgmentsForAllCourts(opts: {
@@ -192,22 +240,33 @@ export async function fetchJudgmentsForAllCourts(opts: {
   fromDate: Date;
   toDate: Date;
   pagesPerCourt?: number;
-}): Promise<Map<IKCourtCode, JudgmentRecord[]>> {
-  const results = new Map<IKCourtCode, JudgmentRecord[]>();
+}): Promise<Map<IKCourtCode, CourtFetchResult>> {
+  const results = new Map<IKCourtCode, CourtFetchResult>();
 
   await Promise.all(
     opts.courts.map(async (court) => {
       try {
-        const judgments = await fetchJudgmentsForCourt({
-          courtCode: court,
-          fromDate: opts.fromDate,
-          toDate: opts.toDate,
-          pages: opts.pagesPerCourt ?? 1,
-        });
-        results.set(court, judgments);
+        results.set(
+          court,
+          await fetchJudgmentsForCourt({
+            courtCode: court,
+            fromDate: opts.fromDate,
+            toDate: opts.toDate,
+            pages: opts.pagesPerCourt ?? 1,
+          }),
+        );
       } catch (err) {
-        console.error(`[IK] Failed for ${court}:`, err);
-        results.set(court, []);
+        // One court failing must not end the run, but it must not read as
+        // "this court published nothing" either — the reason is carried.
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(`[IK] Failed for ${court}: ${message}`);
+        results.set(court, {
+          records: [],
+          found: null,
+          truncated: false,
+          pagesFetched: 0,
+          error: message,
+        });
       }
     }),
   );
