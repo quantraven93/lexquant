@@ -20,7 +20,10 @@ export const IK_COURTS = {
   bombay: "Bombay High Court",
   delhi: "Delhi High Court",
   chennai: "Madras High Court",
-  bangalore: "Karnataka High Court",
+  // IK spells the Karnataka HC doctype 'karnataka'. 'bangalore' is NOT a
+  // valid doctype (verified 2026-09-07) — see IK_DOCSOURCE below for what
+  // IK does with an invalid one.
+  karnataka: "Karnataka High Court",
   allahabad: "Allahabad High Court",
   kolkata_app: "Calcutta High Court (Appellate)",
   madhyapradesh: "Madhya Pradesh High Court",
@@ -33,6 +36,68 @@ export const IK_COURTS = {
 } as const;
 
 export type IKCourtCode = keyof typeof IK_COURTS;
+
+/**
+ * The exact `docsource` IK stamps on a document for each doctype. These are
+ * IK's own strings, not our display names, and they differ in places — note
+ * IK's own misspelling in "Appellete Side". Verified against the live API on
+ * 2026-09-07, ten documents per code.
+ */
+export const IK_DOCSOURCE: Record<IKCourtCode, string> = {
+  supremecourt: "Supreme Court of India",
+  scorders: "Supreme Court - Daily Orders",
+  bombay: "Bombay High Court",
+  delhi: "Delhi High Court",
+  chennai: "Madras High Court",
+  karnataka: "Karnataka High Court",
+  allahabad: "Allahabad High Court",
+  kolkata_app: "Calcutta High Court (Appellete Side)",
+  madhyapradesh: "Madhya Pradesh High Court",
+  punjab: "Punjab-Haryana High Court",
+  jodhpur: "Rajasthan High Court - Jodhpur",
+  amravati: "Andhra Pradesh High Court - Amravati",
+  telangana: "Telangana High Court",
+};
+
+/**
+ * Reject a response we cannot attribute to the court we asked for.
+ *
+ * An unrecognised doctype is NOT an error to the IK API. It silently drops
+ * the filter and returns an unfiltered result set, so the caller receives
+ * ten real judgments from ten unrelated courts and stamps every one of them
+ * with the court it asked for. Verified 2026-09-07: an invented
+ * `doctypes:zzzznotacourt` returned the same 3,153-hit set as the equally
+ * invalid `doctypes:bangalore`, whose page carried Madhya Pradesh, Andhra
+ * Pradesh, Chattisgarh and Gauhati documents. 811 of the 4,576 rows then in
+ * `judgments` were mislabelled "Karnataka High Court" that way.
+ *
+ * A correctly filtered IK response is entirely one docsource, so any stray
+ * means the filter did not apply and the whole page is unattributable. That
+ * is a failed fetch, not data — the same rule the case scrapers apply with
+ * their `parsedAnything` guard. If IK ever renames a court, this fails
+ * loudly for that one court instead of quietly poisoning the corpus.
+ */
+export function attributeDocs(
+  courtCode: IKCourtCode,
+  docs: IKDoc[],
+): IKDoc[] {
+  const expected = IK_DOCSOURCE[courtCode];
+  const strays = docs.filter((doc) => (doc.docsource ?? "") !== expected);
+
+  if (strays.length > 0) {
+    const seen = [
+      ...new Set(strays.map((doc) => doc.docsource || "(no docsource)")),
+    ];
+    throw new Error(
+      `IK returned documents doctypes:${courtCode} did not ask for: ` +
+        `expected "${expected}", but ${strays.length} of ${docs.length} came ` +
+        `from [${seen.join(", ")}]. Treating as a failed fetch — an ` +
+        `unrecognised doctype makes IK drop the filter silently.`,
+    );
+  }
+
+  return docs;
+}
 
 function formatIKDate(d: Date): string {
   const day = String(d.getDate()).padStart(2, "0");
@@ -94,7 +159,9 @@ export async function fetchJudgmentsForCourt(opts: {
     const data: { docs?: IKDoc[]; found?: string } = await response.json();
     if (!data.docs?.length) break;
 
-    for (const doc of data.docs) {
+    const docs = attributeDocs(courtCode, data.docs);
+
+    for (const doc of docs) {
       all.push({
         ik_tid: doc.tid,
         doctype: doc.doctype,
@@ -114,7 +181,7 @@ export async function fetchJudgmentsForCourt(opts: {
       });
     }
 
-    if (data.docs.length < 10) break;
+    if (docs.length < 10) break;
   }
 
   return all;

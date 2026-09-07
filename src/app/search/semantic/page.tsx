@@ -40,7 +40,7 @@ const COURT_FILTERS: { code: string; label: string }[] = [
   { code: "bombay", label: "Bombay HC" },
   { code: "delhi", label: "Delhi HC" },
   { code: "chennai", label: "Madras HC" },
-  { code: "bangalore", label: "Karnataka HC" },
+  { code: "karnataka", label: "Karnataka HC" },
   { code: "allahabad", label: "Allahabad HC" },
   { code: "madhyapradesh", label: "MP HC" },
 ];
