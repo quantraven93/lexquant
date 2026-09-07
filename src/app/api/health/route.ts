@@ -1,19 +1,27 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isMissingColumnError } from "@/lib/courts/case-refresh";
+import { freshWithinWorkingDays } from "@/lib/health/court-calendar";
 
 /**
  * Source-health endpoint backing the menubar live dots and the ticker's
  * "new today" counts. Status is DERIVED from ingest/refresh timestamps in
  * the DB — a dot is live only if its pipeline actually ran recently:
  *
- *   ik      — judgments ingest (daily cron): fresh within 36h
- *   sci     — Supreme Court judgments specifically: fresh within 96h
- *             (SC publishes on working days; 96h spans a weekend)
+ *   ik      — judgments ingest (daily cron): must have produced something
+ *             within one court-working day
+ *   sci     — Supreme Court judgments specifically: within two, since the
+ *             SC's daily volume is small enough that one quiet day is not
+ *             evidence of a fault
  *   ecourts — tracked-case refresh (daily Vercel cron, 03:00 UTC):
- *             fresh within 36h, matching ik's daily cadence. The 30-min
- *             GitHub Action this window used to assume has never had an
- *             ANTHROPIC_API_KEY and produces nothing.
+ *             fresh within 36h. The 30-min GitHub Action the old 3h window
+ *             assumed has never had an ANTHROPIC_API_KEY and produces
+ *             nothing. This one is wall-clock because a court refresh is
+ *             OUR job to run every day, not the courts' job to feed.
+ *
+ * The judgment sources are measured in COURT-WORKING DAYS, not hours,
+ * because the corpus has a weekend hole in it. See
+ * `@/lib/health/court-calendar` for why, and for what that does not model.
  *
  * The ecourts dot reads `last_fetch_ok` — set only when a court fetch
  * actually parsed — not `last_checked_at`, which the cron writes even when
@@ -28,6 +36,10 @@ export const dynamic = "force-dynamic";
 
 const HOUR_MS = 3_600_000;
 const IST_OFFSET_MS = 5.5 * HOUR_MS;
+
+/** Court-working days a judgment source may go quiet before its dot reds. */
+const IK_MAX_QUIET_WORKING_DAYS = 1;
+const SCI_MAX_QUIET_WORKING_DAYS = 2;
 
 function freshWithin(ts: string | null, hours: number): boolean {
   if (!ts) return false;
@@ -125,8 +137,14 @@ export async function GET() {
 
   return NextResponse.json({
     sources: {
-      ik: { ok: freshWithin(ikLast, 36), last: ikLast },
-      sci: { ok: freshWithin(sciLast, 96), last: sciLast },
+      ik: {
+        ok: freshWithinWorkingDays(ikLast, IK_MAX_QUIET_WORKING_DAYS),
+        last: ikLast,
+      },
+      sci: {
+        ok: freshWithinWorkingDays(sciLast, SCI_MAX_QUIET_WORKING_DAYS),
+        last: sciLast,
+      },
       ecourts: {
         ok: freshWithin(ecourtsLast, 36),
         last: ecourtsLast,

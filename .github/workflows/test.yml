@@ -45,6 +45,7 @@ jobs:
         run: |
           npx eslint --max-warnings 50 \
             src/lib/embed \
+            src/lib/health \
             src/lib/briefing \
             src/lib/supabase \
             src/lib/ik \
