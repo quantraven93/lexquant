@@ -64,8 +64,7 @@ function toBW(imgBuf: Buffer): InstanceType<typeof PNG> {
   for (let y = 0; y < src.height; y++) {
     for (let x = 0; x < src.width; x++) {
       const idx = (src.width * y + x) * 4;
-      const avg =
-        (src.data[idx] + src.data[idx + 1] + src.data[idx + 2]) / 3;
+      const avg = (src.data[idx] + src.data[idx + 1] + src.data[idx + 2]) / 3;
       const val = avg < 140 ? 0 : 255;
       src.data[idx] = val;
       src.data[idx + 1] = val;
@@ -80,7 +79,7 @@ function toBW(imgBuf: Buffer): InstanceType<typeof PNG> {
 function scalePng(
   src: InstanceType<typeof PNG>,
   scale: number,
-  pad: number = 0
+  pad: number = 0,
 ): Buffer {
   const dstW = src.width * scale + pad * 2;
   const dstH = src.height * scale + pad * 2;
@@ -120,7 +119,7 @@ function cropPng(
   x: number,
   y: number,
   w: number,
-  h: number
+  h: number,
 ): InstanceType<typeof PNG> {
   x = Math.max(0, Math.min(x, src.width - 1));
   y = Math.max(0, Math.min(y, src.height - 1));
@@ -143,7 +142,7 @@ function cropPng(
 
 /** Find connected character ranges using vertical column density */
 function findCharRanges(
-  png: InstanceType<typeof PNG>
+  png: InstanceType<typeof PNG>,
 ): { start: number; end: number }[] {
   const w = png.width;
   const h = png.height;
@@ -176,9 +175,10 @@ function findCharRanges(
 }
 
 /** Find vertical bounds of black pixels */
-function findRowBounds(
-  png: InstanceType<typeof PNG>
-): { top: number; bottom: number } {
+function findRowBounds(png: InstanceType<typeof PNG>): {
+  top: number;
+  bottom: number;
+} {
   const w = png.width;
   const h = png.height;
   let top = h;
@@ -207,7 +207,7 @@ function findRowBounds(
  */
 function detectOperatorFromPixels(
   png: InstanceType<typeof PNG>,
-  charRanges: { start: number; end: number }[]
+  charRanges: { start: number; end: number }[],
 ): string {
   const w = png.width;
   const h = png.height;
@@ -278,12 +278,12 @@ async function solveCaptchaImage(imgBuf: Buffer): Promise<string> {
   // Try to guess digits from character range widths (crude but fast)
   // This is a last-resort fallback when Claude is unavailable
   console.warn(
-    `[SC CAPTCHA] Pixel fallback: detected operator "${operator}", ${charRanges.length} char ranges`
+    `[SC CAPTCHA] Pixel fallback: detected operator "${operator}", ${charRanges.length} char ranges`,
   );
 
   throw new Error(
     "CAPTCHA solving failed: Claude Vision not configured or returned no answer. " +
-      "Set ANTHROPIC_API_KEY environment variable."
+      "Set ANTHROPIC_API_KEY environment variable.",
   );
 }
 
@@ -293,9 +293,7 @@ async function solveCaptchaImage(imgBuf: Buffer): Promise<string> {
  */
 function trySolveCaptchaFromHtml(html: string): string | null {
   // Look for captcha value in data attributes
-  const dataAttrMatch = html.match(
-    /data-captcha=["'](\d+\s*[+\-]\s*\d+)["']/i
-  );
+  const dataAttrMatch = html.match(/data-captcha=["'](\d+\s*[+\-]\s*\d+)["']/i);
   if (dataAttrMatch) {
     return String(evalMathExpression(dataAttrMatch[1]));
   }
@@ -303,23 +301,17 @@ function trySolveCaptchaFromHtml(html: string): string | null {
   // Look for the math expression in alt text of captcha image
   const captchaImgAltMatch =
     html.match(
-      /class=["'][^"']*captcha[^"']*["'][^>]*alt=["'](\d+\s*[+\-]\s*\d+)["']/i
+      /class=["'][^"']*captcha[^"']*["'][^>]*alt=["'](\d+\s*[+\-]\s*\d+)["']/i,
     ) ||
-    html.match(
-      /alt=["'](\d+\s*[+\-]\s*\d+)["'][^>]*class=["'][^"']*captcha/i
-    );
+    html.match(/alt=["'](\d+\s*[+\-]\s*\d+)["'][^>]*class=["'][^"']*captcha/i);
   if (captchaImgAltMatch) {
     return String(evalMathExpression(captchaImgAltMatch[1]));
   }
 
   // Look for hidden input with captcha answer
   const hiddenAnswerMatch =
-    html.match(
-      /name=["']siwp_captcha_result["']\s+value=["'](\d+)["']/i
-    ) ||
-    html.match(
-      /id=["']siwp_captcha_result["']\s+value=["'](\d+)["']/i
-    );
+    html.match(/name=["']siwp_captcha_result["']\s+value=["'](\d+)["']/i) ||
+    html.match(/id=["']siwp_captcha_result["']\s+value=["'](\d+)["']/i);
   if (hiddenAnswerMatch) {
     return hiddenAnswerMatch[1];
   }
@@ -358,12 +350,13 @@ interface SCSession {
  * Fetches the SC case status page and extracts session data + CAPTCHA answer.
  * @param pageUrl - which SC page to get the session from (case number vs party name page)
  */
-async function getSession(pageUrl: string = SC_CASE_STATUS_PAGE): Promise<SCSession> {
+async function getSession(
+  pageUrl: string = SC_CASE_STATUS_PAGE,
+): Promise<SCSession> {
   const response = await fetch(pageUrl, {
     headers: {
       "User-Agent": UA,
-      Accept:
-        "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
       "Accept-Language": "en-US,en;q=0.5",
     },
     signal: AbortSignal.timeout(15000),
@@ -372,7 +365,7 @@ async function getSession(pageUrl: string = SC_CASE_STATUS_PAGE): Promise<SCSess
 
   if (!response.ok) {
     throw new Error(
-      `Failed to fetch SC page: ${response.status} ${response.statusText}`
+      `Failed to fetch SC page: ${response.status} ${response.statusText}`,
     );
   }
 
@@ -393,7 +386,7 @@ async function getSession(pageUrl: string = SC_CASE_STATUS_PAGE): Promise<SCSess
 
   // Extract CSRF token
   const tokenMatch = html.match(
-    /name=["'](tok_[a-f0-9]+)["']\s+value=["']([^"']+)["']/i
+    /name=["'](tok_[a-f0-9]+)["']\s+value=["']([^"']+)["']/i,
   );
   if (!tokenMatch) throw new Error("Could not extract CSRF token from SC page");
   const tokenName = tokenMatch[1];
@@ -408,11 +401,9 @@ async function getSession(pageUrl: string = SC_CASE_STATUS_PAGE): Promise<SCSess
   // Extract CAPTCHA image URL for OCR
   const captchaImgMatch =
     html.match(
-      /class=["'][^"']*siwp_captcha_image[^"']*["'][^>]*src=["']([^"']+)["']/i
+      /class=["'][^"']*siwp_captcha_image[^"']*["'][^>]*src=["']([^"']+)["']/i,
     ) ||
-    html.match(
-      /id=["']siwp_captcha_image_0["'][^>]*src=["']([^"']+)["']/i
-    );
+    html.match(/id=["']siwp_captcha_image_0["'][^>]*src=["']([^"']+)["']/i);
 
   if (!captchaImgMatch) {
     throw new Error("Could not find CAPTCHA image URL in SC page");
@@ -478,14 +469,14 @@ function resolveCaseTypeCode(caseType: string, caseTypeCode?: string): string {
   if (aliases[stripped]) return aliases[stripped];
 
   console.warn(
-    `[SC Scraper] Unknown case type "${caseType}", defaulting to 5 (W.P.(C))`
+    `[SC Scraper] Unknown case type "${caseType}", defaulting to 5 (W.P.(C))`,
   );
   return "5";
 }
 
 // ---- HTML Parsing ----
 
-function parseResultsHtml(html: string): CaseStatus | null {
+export function parseResultsHtml(html: string): CaseStatus | null {
   if (!html || html.trim().length === 0) return null;
 
   const stripTags = (s: string): string =>
@@ -504,16 +495,13 @@ function parseResultsHtml(html: string): CaseStatus | null {
     const patterns = [
       new RegExp(
         `<t[dh][^>]*>\\s*${escaped}\\s*:?\\s*</t[dh]>\\s*<t[dh][^>]*>([\\s\\S]*?)</t[dh]>`,
-        "i"
+        "i",
       ),
       new RegExp(
         `<strong>\\s*${escaped}\\s*:?\\s*</strong>\\s*:?\\s*([^<]+)`,
-        "i"
+        "i",
       ),
-      new RegExp(
-        `${escaped}\\s*:?\\s*</[^>]+>\\s*<[^>]+>([^<]+)`,
-        "i"
-      ),
+      new RegExp(`${escaped}\\s*:?\\s*</[^>]+>\\s*<[^>]+>([^<]+)`, "i"),
     ];
 
     for (const pattern of patterns) {
@@ -540,16 +528,16 @@ function parseResultsHtml(html: string): CaseStatus | null {
     extractField("Appellant") ||
     "";
 
-  const respondent =
-    allCells[4] ||
-    extractField("Respondent") ||
-    "";
+  const respondent = allCells[4] || extractField("Respondent") || "";
 
+  // No "Pending" fallback: an unread status stays empty so callers can tell
+  // "not read" from a status the Court actually publishes. A fabricated
+  // "Pending" here overwrote real DISPOSED statuses and fired false alerts.
   const currentStatus =
     allCells[5] ||
     extractField("Case Status") ||
     extractField("Disposal Nature") ||
-    "Pending";
+    "";
 
   const caseTitle =
     (petitioner && respondent && petitioner !== "Respondent Name"
@@ -557,7 +545,9 @@ function parseResultsHtml(html: string): CaseStatus | null {
       : null) ||
     extractField("Case Title") ||
     extractField("Title") ||
-    petitioner || respondent || "Unknown";
+    petitioner ||
+    respondent ||
+    "";
 
   const petitionerAdvocate =
     extractField("Pet\\. Advocate") ||
@@ -570,13 +560,10 @@ function parseResultsHtml(html: string): CaseStatus | null {
     extractField("Advocate for Respondent");
 
   const judges =
-    extractField("Bench") ||
-    extractField("Coram") ||
-    extractField("Judge");
+    extractField("Bench") || extractField("Coram") || extractField("Judge");
 
   const filingDate =
-    extractField("Filing Date") ||
-    extractField("Date of Filing");
+    extractField("Filing Date") || extractField("Date of Filing");
 
   const registrationDate =
     extractField("Registration Date") ||
@@ -585,7 +572,7 @@ function parseResultsHtml(html: string): CaseStatus | null {
 
   // Try to extract registration date from case number cell (e.g., "Registered on 02-01-2025")
   const regDateFromCell = allCells[2]?.match(
-    /Registered on\s+(\d{2}-\d{2}-\d{4})/i
+    /Registered on\s+(\d{2}-\d{2}-\d{4})/i,
   );
 
   const nextHearingDate =
@@ -595,17 +582,15 @@ function parseResultsHtml(html: string): CaseStatus | null {
     extractField("Listed On");
 
   const lastOrderDate =
-    extractField("Last Order Date") ||
-    extractField("Order Date");
+    extractField("Last Order Date") || extractField("Order Date");
 
   const decisionDate =
-    extractField("Decision Date") ||
-    extractField("Disposal Date");
+    extractField("Decision Date") || extractField("Disposal Date");
 
   // Parse hearing history
   const hearingHistory: HearingEntry[] = [];
   const historyTableMatch = html.match(
-    /(?:hearing|history|listing)[\s\S]*?<table[^>]*>([\s\S]*?)<\/table>/i
+    /(?:hearing|history|listing)[\s\S]*?<table[^>]*>([\s\S]*?)<\/table>/i,
   );
   if (historyTableMatch) {
     const rows =
@@ -632,11 +617,10 @@ function parseResultsHtml(html: string): CaseStatus | null {
   // Parse orders
   const orders: OrderEntry[] = [];
   const orderTableMatch = html.match(
-    /(?:order|judgment)[\s\S]*?<table[^>]*>([\s\S]*?)<\/table>/i
+    /(?:order|judgment)[\s\S]*?<table[^>]*>([\s\S]*?)<\/table>/i,
   );
   if (orderTableMatch) {
-    const rows =
-      orderTableMatch[1].match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
+    const rows = orderTableMatch[1].match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
     for (const row of rows) {
       const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [];
       if (cells.length >= 2) {
@@ -657,6 +641,29 @@ function parseResultsHtml(html: string): CaseStatus | null {
     }
   }
 
+  // A response none of the extractors could read anything out of is a failed
+  // fetch, not a case whose every field is blank. Returning an object here
+  // let the caller book a successful check and overwrite good stored data.
+  const parsedAnything =
+    caseTitle ||
+    petitioner ||
+    respondent ||
+    currentStatus ||
+    judges ||
+    filingDate ||
+    registrationDate ||
+    regDateFromCell?.[1] ||
+    decisionDate ||
+    nextHearingDate ||
+    lastOrderDate ||
+    hearingHistory.length > 0 ||
+    orders.length > 0;
+
+  if (!parsedAnything) {
+    console.warn("[SC] Response carried no recognisable case fields");
+    return null;
+  }
+
   return {
     caseTitle,
     currentStatus,
@@ -666,8 +673,7 @@ function parseResultsHtml(html: string): CaseStatus | null {
     respondentAdvocate: respondentAdvocate || undefined,
     judges: judges || undefined,
     filingDate: filingDate || undefined,
-    registrationDate:
-      registrationDate || regDateFromCell?.[1] || undefined,
+    registrationDate: registrationDate || regDateFromCell?.[1] || undefined,
     decisionDate: decisionDate || undefined,
     nextHearingDate: nextHearingDate || undefined,
     lastOrderDate: lastOrderDate || undefined,
@@ -691,7 +697,7 @@ function parseResultsHtml(html: string): CaseStatus | null {
  */
 function parseSearchResultsHtml(
   html: string,
-  _caseType: string
+  _caseType: string,
 ): SearchResult[] {
   const results: SearchResult[] = [];
 
@@ -718,8 +724,8 @@ function parseSearchResultsHtml(
       continue;
 
     // Column mapping for SC party name search
-    const diaryNo = cellValues[1] || "";        // "133/2026"
-    const caseNoCell = cellValues[2] || "";      // "SLP(Crl) No. 002090 / 2026 Registered on ..."
+    const diaryNo = cellValues[1] || ""; // "133/2026"
+    const caseNoCell = cellValues[2] || ""; // "SLP(Crl) No. 002090 / 2026 Registered on ..."
     const petitioner = cellValues[3] || "";
     const respondent = cellValues[4] || "";
     const status = cellValues[5] || "";
@@ -730,20 +736,20 @@ function parseSearchResultsHtml(
     // Try to parse case type and number from Case Number cell
     // e.g. "SLP(Crl) No. 002090 - 002091 / 2026 Registered on 03-02-2026"
     const caseDetailMatch = caseNoCell.match(
-      /([A-Za-z().]+(?:\s*[A-Za-z().]+)*)\s*No\.\s*(\d+)(?:\s*-\s*\d+)?\s*\/\s*(\d{4})/
+      /([A-Za-z().]+(?:\s*[A-Za-z().]+)*)\s*No\.\s*(\d+)(?:\s*-\s*\d+)?\s*\/\s*(\d{4})/,
     );
 
     const parsedCaseType = caseDetailMatch ? caseDetailMatch[1].trim() : "";
     const caseNumber = caseDetailMatch
       ? caseDetailMatch[2]
       : diaryMatch
-      ? diaryMatch[1]
-      : diaryNo;
+        ? diaryMatch[1]
+        : diaryNo;
     const caseYear = caseDetailMatch
       ? caseDetailMatch[3]
       : diaryMatch
-      ? diaryMatch[2]
-      : "";
+        ? diaryMatch[2]
+        : "";
 
     const caseTitle =
       petitioner && respondent
@@ -776,7 +782,7 @@ function parseSearchResultsHtml(
 async function fetchCaseDetails(
   diaryNo: string,
   diaryYear: string,
-  cookies: string
+  cookies: string,
 ): Promise<Partial<CaseStatus> | null> {
   try {
     const params = new URLSearchParams({
@@ -803,25 +809,37 @@ async function fetchCaseDetails(
     const data = await response.json();
     if (!data.success) return null;
 
-    const html = typeof data.data === "string" ? data.data : data.data?.resultsHtml || "";
+    const html =
+      typeof data.data === "string" ? data.data : data.data?.resultsHtml || "";
     if (!html || html.length < 100) return null;
 
-    console.log(`[SC Detail] Got ${html.length} chars for diary ${diaryNo}/${diaryYear}`);
+    console.log(
+      `[SC Detail] Got ${html.length} chars for diary ${diaryNo}/${diaryYear}`,
+    );
 
     const stripTags = (s: string): string =>
-      s.replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").trim();
+      s
+        .replace(/<[^>]+>/g, "")
+        .replace(/&nbsp;/g, " ")
+        .replace(/&amp;/g, "&")
+        .trim();
 
     // Extract label-value pairs from the detail table
     const extractDetail = (label: string): string => {
       const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const match = html.match(
-        new RegExp(`<td[^>]*>\\s*${escaped}\\s*</td>\\s*<td[^>]*>([\\s\\S]*?)</td>`, "i")
+        new RegExp(
+          `<td[^>]*>\\s*${escaped}\\s*</td>\\s*<td[^>]*>([\\s\\S]*?)</td>`,
+          "i",
+        ),
       );
       return match ? stripTags(match[1]) : "";
     };
 
     const judges = (() => {
-      const m = html.match(/Present\/Last Listed On[\s\S]*?<td[^>]*>([\s\S]*?)<\/td>/i);
+      const m = html.match(
+        /Present\/Last Listed On[\s\S]*?<td[^>]*>([\s\S]*?)<\/td>/i,
+      );
       if (m) {
         const judgeMatch = m[1].match(/\[([^\]]*JUSTICE[^\]]*)\]/i);
         if (judgeMatch) return judgeMatch[1].replace(/and/gi, ", ").trim();
@@ -832,30 +850,48 @@ async function fetchCaseDetails(
     })();
 
     const lastListedDate = (() => {
-      const m = html.match(/Present\/Last Listed On[\s\S]*?<td[^>]*>[\s\S]*?(\d{2}-\d{2}-\d{4})/i);
+      const m = html.match(
+        /Present\/Last Listed On[\s\S]*?<td[^>]*>[\s\S]*?(\d{2}-\d{2}-\d{4})/i,
+      );
       return m ? m[1] : "";
     })();
 
     const filingDate = (() => {
-      const m = extractDetail("Diary Number").match(/Filed on\s+(\d{2}-\d{2}-\d{4})/i);
+      const m = extractDetail("Diary Number").match(
+        /Filed on\s+(\d{2}-\d{2}-\d{4})/i,
+      );
       return m ? m[1] : "";
     })();
 
     const disposalDate = (() => {
-      const m = extractDetail("Status/Stage").match(/Disposal Date:\s*(\d{2}-\d{2}-\d{4})/i);
+      const m = extractDetail("Status/Stage").match(
+        /Disposal Date:\s*(\d{2}-\d{2}-\d{4})/i,
+      );
       return m ? m[1] : "";
     })();
 
-    const petitioner = extractDetail("Petitioner(s)").replace(/^\d+\s*/, "").split(/\d+\s+/)[0]?.trim() || "";
-    const respondent = extractDetail("Respondent(s)").replace(/^\d+\s*/, "").split(/\d+\s+/)[0]?.trim() || "";
-    const petitionerAdvocate = extractDetail("Petitioner Advocate(s)").split(/\n/)[0]?.trim() || "";
-    const respondentAdvocate = extractDetail("Respondent Advocate(s)").split(/\n/)[0]?.trim() || "";
+    const petitioner =
+      extractDetail("Petitioner(s)")
+        .replace(/^\d+\s*/, "")
+        .split(/\d+\s+/)[0]
+        ?.trim() || "";
+    const respondent =
+      extractDetail("Respondent(s)")
+        .replace(/^\d+\s*/, "")
+        .split(/\d+\s+/)[0]
+        ?.trim() || "";
+    const petitionerAdvocate =
+      extractDetail("Petitioner Advocate(s)").split(/\n/)[0]?.trim() || "";
+    const respondentAdvocate =
+      extractDetail("Respondent Advocate(s)").split(/\n/)[0]?.trim() || "";
     const cnrNumber = extractDetail("CNR Number");
     const category = extractDetail("Category");
-    const currentStatus = extractDetail("Status/Stage").split("(")[0]?.trim() || "";
+    const currentStatus =
+      extractDetail("Status/Stage").split("(")[0]?.trim() || "";
 
     return {
-      caseTitle: petitioner && respondent ? `${petitioner} vs ${respondent}` : undefined,
+      caseTitle:
+        petitioner && respondent ? `${petitioner} vs ${respondent}` : undefined,
       currentStatus: currentStatus || undefined,
       petitioner: petitioner || undefined,
       respondent: respondent || undefined,
@@ -882,14 +918,15 @@ async function fetchCaseDetails(
 async function fetchCaseStatusWithRetry(
   caseTypeCode: string,
   caseNumber: string,
-  year: string
+  year: string,
 ): Promise<CaseStatus | null> {
   for (let attempt = 1; attempt <= MAX_CAPTCHA_RETRIES; attempt++) {
     try {
       const session = await getSession();
 
       // Diary numbers use a different action and field names
-      const isDiary = caseTypeCode === "31" || caseTypeCode.toUpperCase() === "DIARY";
+      const isDiary =
+        caseTypeCode === "31" || caseTypeCode.toUpperCase() === "DIARY";
       const params = isDiary
         ? new URLSearchParams({
             action: "get_case_status_diary_no",
@@ -930,7 +967,7 @@ async function fetchCaseStatusWithRetry(
 
       if (!response.ok) {
         throw new Error(
-          `SC ajax failed: ${response.status} ${response.statusText}`
+          `SC ajax failed: ${response.status} ${response.statusText}`,
         );
       }
 
@@ -939,15 +976,13 @@ async function fetchCaseStatusWithRetry(
       if (!data.success) {
         // Check if it's a captcha error (should retry)
         const errorMsg =
-          typeof data.data === "string"
-            ? data.data
-            : data.data?.message || "";
+          typeof data.data === "string" ? data.data : data.data?.message || "";
         if (
           errorMsg.toLowerCase().includes("captcha") &&
           attempt < MAX_CAPTCHA_RETRIES
         ) {
           console.warn(
-            `[SC Scraper] CAPTCHA incorrect (attempt ${attempt}/${MAX_CAPTCHA_RETRIES}), retrying...`
+            `[SC Scraper] CAPTCHA incorrect (attempt ${attempt}/${MAX_CAPTCHA_RETRIES}), retrying...`,
           );
           continue;
         }
@@ -955,8 +990,7 @@ async function fetchCaseStatusWithRetry(
         return null;
       }
 
-      const resultsHtml =
-        data.data?.resultsHtml || data.data?.html || "";
+      const resultsHtml = data.data?.resultsHtml || data.data?.html || "";
       if (!resultsHtml) {
         console.warn("[SC Scraper] No results HTML in response");
         return null;
@@ -973,20 +1007,35 @@ async function fetchCaseStatusWithRetry(
         };
 
         // Try to fetch detailed case info using diary number (no extra CAPTCHA needed)
-        console.log(`[SC Scraper] Parsed OK. Looking for diary in ${resultsHtml.length} chars. Has data-diary-no: ${resultsHtml.includes('data-diary-no')}`);
-        const diaryMatch = resultsHtml.match(/data-diary-no="(\d+)"\s*data-diary-year="(\d{4})"/);
+        console.log(
+          `[SC Scraper] Parsed OK. Looking for diary in ${resultsHtml.length} chars. Has data-diary-no: ${resultsHtml.includes("data-diary-no")}`,
+        );
+        const diaryMatch = resultsHtml.match(
+          /data-diary-no="(\d+)"\s*data-diary-year="(\d{4})"/,
+        );
         if (diaryMatch && session.cookies) {
-          console.log(`[SC Scraper] Fetching detail view for diary ${diaryMatch[1]}/${diaryMatch[2]}`);
-          const details = await fetchCaseDetails(diaryMatch[1], diaryMatch[2], session.cookies);
+          console.log(
+            `[SC Scraper] Fetching detail view for diary ${diaryMatch[1]}/${diaryMatch[2]}`,
+          );
+          const details = await fetchCaseDetails(
+            diaryMatch[1],
+            diaryMatch[2],
+            session.cookies,
+          );
           if (details) {
             // Merge detail data into parsed result
             if (details.judges) parsed.judges = details.judges;
             if (details.filingDate) parsed.filingDate = details.filingDate;
-            if (details.petitionerAdvocate) parsed.petitionerAdvocate = details.petitionerAdvocate;
-            if (details.respondentAdvocate) parsed.respondentAdvocate = details.respondentAdvocate;
-            if (details.nextHearingDate) parsed.nextHearingDate = details.nextHearingDate;
-            if (details.decisionDate) parsed.decisionDate = details.decisionDate;
-            if (details.currentStatus) parsed.currentStatus = details.currentStatus;
+            if (details.petitionerAdvocate)
+              parsed.petitionerAdvocate = details.petitionerAdvocate;
+            if (details.respondentAdvocate)
+              parsed.respondentAdvocate = details.respondentAdvocate;
+            if (details.nextHearingDate)
+              parsed.nextHearingDate = details.nextHearingDate;
+            if (details.decisionDate)
+              parsed.decisionDate = details.decisionDate;
+            if (details.currentStatus)
+              parsed.currentStatus = details.currentStatus;
             if (details.rawData) {
               parsed.rawData = { ...parsed.rawData, ...details.rawData };
             }
@@ -1003,7 +1052,7 @@ async function fetchCaseStatusWithRetry(
     } catch (error) {
       if (attempt < MAX_CAPTCHA_RETRIES) {
         console.warn(
-          `[SC Scraper] Attempt ${attempt} failed: ${error}, retrying...`
+          `[SC Scraper] Attempt ${attempt} failed: ${error}, retrying...`,
         );
         continue;
       }
@@ -1021,7 +1070,7 @@ async function fetchCaseStatusWithRetry(
 async function searchPartyNameForYearStatus(
   partyName: string,
   year: string,
-  partyStatus: string
+  partyStatus: string,
 ): Promise<SearchResult[]> {
   for (let attempt = 1; attempt <= MAX_CAPTCHA_RETRIES; attempt++) {
     try {
@@ -1042,7 +1091,9 @@ async function searchPartyNameForYearStatus(
         language: "en",
       });
 
-      console.log(`[SC Search] year=${year} status=${partyStatus} attempt=${attempt} captcha=${session.captchaAnswer}`);
+      console.log(
+        `[SC Search] year=${year} status=${partyStatus} attempt=${attempt} captcha=${session.captchaAnswer}`,
+      );
 
       const response = await fetch(SC_AJAX_URL, {
         method: "POST",
@@ -1061,7 +1112,7 @@ async function searchPartyNameForYearStatus(
 
       if (!response.ok) {
         throw new Error(
-          `SC party search failed: ${response.status} ${response.statusText}`
+          `SC party search failed: ${response.status} ${response.statusText}`,
         );
       }
 
@@ -1069,9 +1120,7 @@ async function searchPartyNameForYearStatus(
 
       if (!data.success) {
         const errorMsg =
-          typeof data.data === "string"
-            ? data.data
-            : data.data?.message || "";
+          typeof data.data === "string" ? data.data : data.data?.message || "";
         if (
           errorMsg.toLowerCase().includes("captcha") &&
           attempt < MAX_CAPTCHA_RETRIES
@@ -1091,11 +1140,15 @@ async function searchPartyNameForYearStatus(
         (typeof data.data === "string" ? data.data : "");
 
       if (!resultsHtml) {
-        console.log(`[SC Search] Empty response for year=${year} status=${partyStatus}`);
+        console.log(
+          `[SC Search] Empty response for year=${year} status=${partyStatus}`,
+        );
         return [];
       }
 
-      console.log(`[SC Search] Got ${resultsHtml.length} chars for year=${year} status=${partyStatus}`);
+      console.log(
+        `[SC Search] Got ${resultsHtml.length} chars for year=${year} status=${partyStatus}`,
+      );
       return parseSearchResultsHtml(resultsHtml, "");
     } catch (error) {
       console.error(`[SC Search] Attempt ${attempt} error:`, error);
@@ -1114,7 +1167,7 @@ async function searchPartyNameForYearStatus(
  */
 async function searchByPartyNameSC(
   partyName: string,
-  year?: string
+  year?: string,
 ): Promise<SearchResult[]> {
   const currentYear = new Date().getFullYear();
   // Search current year and previous year with Pending status
@@ -1129,7 +1182,11 @@ async function searchByPartyNameSC(
   for (const yr of yearsToSearch) {
     for (const status of statusesToSearch) {
       try {
-        const results = await searchPartyNameForYearStatus(partyName, yr, status);
+        const results = await searchPartyNameForYearStatus(
+          partyName,
+          yr,
+          status,
+        );
         for (const r of results) {
           // Deduplicate by case number + year
           const key = `${r.caseNumber}-${r.caseYear}-${r.caseType}`;
@@ -1138,9 +1195,14 @@ async function searchByPartyNameSC(
             allResults.push(r);
           }
         }
-        console.log(`[SC Search] year=${yr} status=${status}: ${results.length} results (total: ${allResults.length})`);
+        console.log(
+          `[SC Search] year=${yr} status=${status}: ${results.length} results (total: ${allResults.length})`,
+        );
       } catch (error) {
-        console.error(`[SC Search] Failed for year=${yr} status=${status}:`, error);
+        console.error(
+          `[SC Search] Failed for year=${yr} status=${status}:`,
+          error,
+        );
       }
       // Small delay between requests to be respectful
       if (allResults.length > 50) break; // Stop if we already have plenty
@@ -1148,7 +1210,9 @@ async function searchByPartyNameSC(
     if (allResults.length > 50) break;
   }
 
-  console.log(`[SC Search] Total results for "${partyName}": ${allResults.length}`);
+  console.log(
+    `[SC Search] Total results for "${partyName}": ${allResults.length}`,
+  );
   return allResults;
 }
 
@@ -1166,14 +1230,12 @@ export const scProvider: CourtApiProvider = {
     }
   },
 
-  async getCaseStatus(
-    identifier: CaseIdentifier
-  ): Promise<CaseStatus | null> {
+  async getCaseStatus(identifier: CaseIdentifier): Promise<CaseStatus | null> {
     if (identifier.courtType !== "SC") return null;
 
     const caseTypeCode = resolveCaseTypeCode(
       identifier.caseType,
-      identifier.caseTypeCode
+      identifier.caseTypeCode,
     );
 
     // Strip leading zeros from case number (SC expects "1536" not "001536")
@@ -1183,7 +1245,7 @@ export const scProvider: CourtApiProvider = {
       return await fetchCaseStatusWithRetry(
         caseTypeCode,
         cleanCaseNumber,
-        identifier.caseYear
+        identifier.caseYear,
       );
     } catch (error) {
       console.error("[SC Scraper] getCaseStatus error:", error);
@@ -1193,7 +1255,7 @@ export const scProvider: CourtApiProvider = {
 
   async getCaseByCNR(cnrNumber: string): Promise<CaseStatus | null> {
     console.warn(
-      "[SC Scraper] CNR lookup not supported for Supreme Court. Use case number instead."
+      "[SC Scraper] CNR lookup not supported for Supreme Court. Use case number instead.",
     );
     return null;
   },

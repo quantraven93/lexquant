@@ -32,17 +32,36 @@ const ECOURTS_HC_BASE = "https://hcservices.ecourts.gov.in/ecourtindiaHC";
 
 /** State code mapping for High Courts */
 const HC_STATE_CODES: Record<string, string> = {
-  AP: "2", TG: "29", KA: "3", KL: "4", TN: "10", MH: "14",
-  DL: "8", UP: "13", RJ: "9", GJ: "17", MP: "1", WB: "16",
-  BR: "19", JH: "7", OD: "11", HP: "5", UK: "15", CT: "18",
-  JK: "12", SK: "24", TR: "20", ML: "21", MN: "25", AS: "6",
+  AP: "2",
+  TG: "29",
+  KA: "3",
+  KL: "4",
+  TN: "10",
+  MH: "14",
+  DL: "8",
+  UP: "13",
+  RJ: "9",
+  GJ: "17",
+  MP: "1",
+  WB: "16",
+  BR: "19",
+  JH: "7",
+  OD: "11",
+  HP: "5",
+  UK: "15",
+  CT: "18",
+  JK: "12",
+  SK: "24",
+  TR: "20",
+  ML: "21",
+  MN: "25",
+  AS: "6",
 };
 
 const COMMON_HEADERS = {
   "User-Agent":
     "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
-  Accept:
-    "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+  Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
   "Accept-Language": "en-US,en;q=0.5",
   "Content-Type": "application/x-www-form-urlencoded",
 };
@@ -50,19 +69,19 @@ const COMMON_HEADERS = {
 /** State code to HC court mapping for routing */
 const STATE_TO_HC: Record<string, string> = {
   "1": "allahabad",
-  "2": "ap",      // Andhra Pradesh
+  "2": "ap", // Andhra Pradesh
   "3": "bombay",
   "4": "calcutta",
   "5": "chhattisgarh",
   "6": "delhi",
   "7": "guwahati",
   "8": "gujarat",
-  "9": "hp",      // Himachal Pradesh
-  "10": "jk",     // Jammu & Kashmir
+  "9": "hp", // Himachal Pradesh
+  "10": "jk", // Jammu & Kashmir
   "11": "jharkhand",
   "12": "karnataka",
   "13": "kerala",
-  "14": "mp",     // Madhya Pradesh
+  "14": "mp", // Madhya Pradesh
   "15": "madras",
   "16": "manipur",
   "17": "meghalaya",
@@ -96,7 +115,7 @@ const MAX_CAPTCHA_RETRIES = 3;
  * 4. Return session with cookies + captcha value
  */
 async function getEcourtsSession(
-  baseUrl: string
+  baseUrl: string,
 ): Promise<EcourtsSession | null> {
   try {
     // Step 1: Get session page and cookies
@@ -111,7 +130,7 @@ async function getEcourtsSession(
 
     if (!response.ok) {
       console.warn(
-        `[eCourts] Failed to fetch session page: ${response.status}`
+        `[eCourts] Failed to fetch session page: ${response.status}`,
       );
       return null;
     }
@@ -125,7 +144,9 @@ async function getEcourtsSession(
     const html = await response.text();
 
     // Step 2: Extract app_token from hidden field
-    const tokenMatch = html.match(/id=['"]app_token['"][^>]*value=['"]([^'"]*)['"]/i);
+    const tokenMatch = html.match(
+      /id=['"]app_token['"][^>]*value=['"]([^'"]*)['"]/i,
+    );
     const appToken = tokenMatch ? tokenMatch[1] : "";
 
     // Step 3: Extract CAPTCHA image URL from the page
@@ -134,17 +155,15 @@ async function getEcourtsSession(
     // <img src="/ecourtindv2/securimage/securimage_show.php" ...>
     const captchaImgMatch =
       html.match(
-        /src=["']([^"']*(?:captcha|securimage)[^"']*(?:\.php|\.png|\.jpg)[^"']*)["']/i
+        /src=["']([^"']*(?:captcha|securimage)[^"']*(?:\.php|\.png|\.jpg)[^"']*)["']/i,
       ) ||
-      html.match(
-        /id=["']captcha_image["'][^>]*src=["']([^"']+)["']/i
-      ) ||
-      html.match(
-        /src=["']([^"']+)["'][^>]*id=["']captcha_image["']/i
-      );
+      html.match(/id=["']captcha_image["'][^>]*src=["']([^"']+)["']/i) ||
+      html.match(/src=["']([^"']+)["'][^>]*id=["']captcha_image["']/i);
 
     if (!captchaImgMatch) {
-      console.warn("[eCourts] No CAPTCHA image found on page, trying without CAPTCHA...");
+      console.warn(
+        "[eCourts] No CAPTCHA image found on page, trying without CAPTCHA...",
+      );
       return { cookies, captchaValue: "", appToken };
     }
 
@@ -170,7 +189,9 @@ async function getEcourtsSession(
     });
 
     if (!imgResponse.ok) {
-      console.warn(`[eCourts] Failed to fetch CAPTCHA image: ${imgResponse.status}`);
+      console.warn(
+        `[eCourts] Failed to fetch CAPTCHA image: ${imgResponse.status}`,
+      );
       return { cookies, captchaValue: "", appToken };
     }
 
@@ -185,7 +206,9 @@ async function getEcourtsSession(
 
     // Step 5: Solve CAPTCHA using Claude Vision
     if (!isAIConfigured()) {
-      console.warn("[eCourts] Claude Vision not configured, cannot solve CAPTCHA");
+      console.warn(
+        "[eCourts] Claude Vision not configured, cannot solve CAPTCHA",
+      );
       return { cookies: allCookies, captchaValue: "", appToken };
     }
 
@@ -193,7 +216,9 @@ async function getEcourtsSession(
     const captchaAnswer = await solveCaptchaWithVision(imageBuffer);
 
     if (captchaAnswer) {
-      console.log(`[eCourts] CAPTCHA solved via Claude Vision: "${captchaAnswer}"`);
+      console.log(
+        `[eCourts] CAPTCHA solved via Claude Vision: "${captchaAnswer}"`,
+      );
       return { cookies: allCookies, captchaValue: captchaAnswer, appToken };
     }
 
@@ -223,7 +248,9 @@ function parseV6Response(text: string): { success: boolean; html: string } {
   } catch {
     // Response might be raw HTML page (session expired / wrong URL)
     if (text.includes("<!DOCTYPE") || text.includes("<html")) {
-      console.warn("[eCourts] Got full HTML page instead of JSON — session issue");
+      console.warn(
+        "[eCourts] Got full HTML page instead of JSON — session issue",
+      );
       return { success: false, html: "" };
     }
     if (text.includes("Invalid Captcha") || text.includes("invalid captcha")) {
@@ -241,7 +268,7 @@ function buildV6Request(
   baseUrl: string,
   endpoint: string,
   params: Record<string, string>,
-  session: EcourtsSession
+  session: EcourtsSession,
 ): { url: string; body: string } {
   const url = `${baseUrl}/?p=${endpoint}`;
   const formData = new URLSearchParams(params);
@@ -276,28 +303,25 @@ function extractField(html: string, label: string): string {
     // <td>Label</td><td>: Value</td>
     new RegExp(
       `<td[^>]*>\\s*${escapedLabel}\\s*</td>\\s*<td[^>]*>\\s*:?\\s*([\\s\\S]*?)</td>`,
-      "i"
+      "i",
     ),
     // <strong>Label</strong> : Value
     new RegExp(
       `<strong[^>]*>\\s*${escapedLabel}\\s*</strong>\\s*:?\\s*([^<]+)`,
-      "i"
+      "i",
     ),
     // <label>Label</label> <span>Value</span>
     new RegExp(
       `<label[^>]*>\\s*${escapedLabel}\\s*:?\\s*</label>\\s*<[^>]+>([^<]+)`,
-      "i"
+      "i",
     ),
     // <b>Label :</b> Value
     new RegExp(
       `<b[^>]*>\\s*${escapedLabel}\\s*:?\\s*</b>\\s*:?\\s*([^<]+)`,
-      "i"
+      "i",
     ),
     // Label : Value (plain text in td)
-    new RegExp(
-      `${escapedLabel}\\s*:\\s*([^<\\n]+)`,
-      "i"
-    ),
+    new RegExp(`${escapedLabel}\\s*:\\s*([^<\\n]+)`, "i"),
   ];
 
   for (const pattern of patterns) {
@@ -311,8 +335,9 @@ function extractField(html: string, label: string): string {
 
 /**
  * Parses case status HTML from eCourts response into a CaseStatus object.
+ * Exported so the no-fabricated-defaults contract can be tested directly.
  */
-function parseEcourtsCaseHtml(html: string): CaseStatus | null {
+export function parseEcourtsCaseHtml(html: string): CaseStatus | null {
   if (!html || html.trim().length === 0) {
     return null;
   }
@@ -336,8 +361,7 @@ function parseEcourtsCaseHtml(html: string): CaseStatus | null {
   }
 
   const caseTitle =
-    extractField(html, "Case Title") ||
-    extractField(html, "Case Details");
+    extractField(html, "Case Title") || extractField(html, "Case Details");
 
   const petitioner =
     extractField(html, "Petitioner") ||
@@ -361,14 +385,19 @@ function parseEcourtsCaseHtml(html: string): CaseStatus | null {
     extractField(html, "Advocate for Respondent") ||
     extractField(html, "Resp\\. Adv\\.");
 
+  // No fallback: an unread status must stay empty. A literal default here
+  // made every unparsed response look like a live "Pending" case, and the
+  // cron wrote that over real statuses such as "DISPOSED".
   const currentStatus =
     extractField(html, "Case Status") ||
     extractField(html, "Status") ||
-    extractField(html, "Stage of Case") ||
-    "Pending";
+    extractField(html, "Stage of Case");
 
   const judges =
-    extractField(html, "Coram") ||
+    // eCourts prefixes Coram with an internal court code ("3521Y. LAKSHMANA
+    // RAO"); strip it so this matches what the manual-refresh route stores
+    // and a re-read of the same bench does not register as a change.
+    extractField(html, "Coram").replace(/^\d+/, "").trim() ||
     extractField(html, "Judge") ||
     extractField(html, "Court Number and Judge");
 
@@ -387,8 +416,7 @@ function parseEcourtsCaseHtml(html: string): CaseStatus | null {
     extractField(html, "Next Date of Hearing");
 
   const lastOrderDate =
-    extractField(html, "Last Order Date") ||
-    extractField(html, "Order Date");
+    extractField(html, "Last Order Date") || extractField(html, "Order Date");
 
   const decisionDate =
     extractField(html, "Decision Date") ||
@@ -398,14 +426,17 @@ function parseEcourtsCaseHtml(html: string): CaseStatus | null {
   // Parse acts/sections
   const acts: string[] = [];
   const actsSection = html.match(
-    /(?:acts|under\s+section|act[\s-]+section)[\s\S]*?<table[^>]*>([\s\S]*?)<\/table>/i
+    /(?:acts|under\s+section|act[\s-]+section)[\s\S]*?<table[^>]*>([\s\S]*?)<\/table>/i,
   );
   if (actsSection) {
     const actRows = actsSection[1].match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
     for (const row of actRows) {
       const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [];
       const cellValues = cells.map((c) => stripTags(c));
-      if (cellValues.length >= 2 && !cellValues[0].toLowerCase().includes("act")) {
+      if (
+        cellValues.length >= 2 &&
+        !cellValues[0].toLowerCase().includes("act")
+      ) {
         acts.push(cellValues.filter(Boolean).join(" - "));
       }
     }
@@ -415,7 +446,7 @@ function parseEcourtsCaseHtml(html: string): CaseStatus | null {
   const hearingHistory: HearingEntry[] = [];
   // eCourts has a "Case History" section with a table
   const historyMatch = html.match(
-    /(?:case\s+history|hearing\s+details|business\s+on\s+date)[\s\S]*?<table[^>]*>([\s\S]*?)<\/table>/i
+    /(?:case\s+history|hearing\s+details|business\s+on\s+date)[\s\S]*?<table[^>]*>([\s\S]*?)<\/table>/i,
   );
   if (historyMatch) {
     const rows = historyMatch[1].match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
@@ -446,7 +477,7 @@ function parseEcourtsCaseHtml(html: string): CaseStatus | null {
   // Parse orders
   const orders: OrderEntry[] = [];
   const orderMatch = html.match(
-    /(?:order|orders|judgment)[\s\S]*?<table[^>]*>([\s\S]*?)<\/table>/i
+    /(?:order|orders|judgment)[\s\S]*?<table[^>]*>([\s\S]*?)<\/table>/i,
   );
   if (orderMatch) {
     const rows = orderMatch[1].match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
@@ -475,11 +506,35 @@ function parseEcourtsCaseHtml(html: string): CaseStatus | null {
     }
   }
 
+  // A response none of the extractors could read anything out of is a failed
+  // fetch, not a case whose every field is blank. Returning an object here
+  // let the caller book a successful check and overwrite good stored data.
+  const parsedAnything =
+    caseTitle ||
+    petitioner ||
+    respondent ||
+    currentStatus ||
+    judges ||
+    filingDate ||
+    registrationDate ||
+    decisionDate ||
+    nextHearingDate ||
+    lastOrderDate ||
+    hearingHistory.length > 0 ||
+    orders.length > 0;
+
+  if (!parsedAnything) {
+    console.warn("[eCourts] Response carried no recognisable case fields");
+    return null;
+  }
+
+  // No "Unknown" fallback: an unread title stays empty so callers can tell
+  // "not read" from a title the court actually publishes.
   const resolvedTitle =
     caseTitle ||
     (petitioner && respondent
       ? `${petitioner} vs ${respondent}`
-      : petitioner || respondent || "Unknown");
+      : petitioner || respondent || "");
 
   return {
     caseTitle: resolvedTitle,
@@ -506,11 +561,15 @@ function parseEcourtsCaseHtml(html: string): CaseStatus | null {
  */
 function parseEcourtsSearchHtml(
   html: string,
-  courtType: CourtType
+  courtType: CourtType,
 ): SearchResult[] {
   const results: SearchResult[] = [];
 
-  if (!html || html.includes("No Record Found") || html.includes("Record Not Found")) {
+  if (
+    !html ||
+    html.includes("No Record Found") ||
+    html.includes("Record Not Found")
+  ) {
     return results;
   }
 
@@ -538,7 +597,7 @@ function parseEcourtsSearchHtml(
 
     // Try to extract CNR from a link in the row
     const cnrMatch = row.match(
-      /(?:cnr_number|cnr|cino)=["']?([A-Z0-9]+)["']?/i
+      /(?:cnr_number|cnr|cino)=["']?([A-Z0-9]+)["']?/i,
     );
 
     // Try to parse case number pattern like "WP(C)/1234/2025"
@@ -547,7 +606,7 @@ function parseEcourtsSearchHtml(
       cellValues[2]?.match(/([A-Za-z/().]+)\s*\/?\s*(\d+)\s*\/\s*(\d{4})/);
 
     const titleCell = cellValues.find(
-      (c) => c.includes(" vs ") || c.includes(" v. ") || c.includes(" Vs ")
+      (c) => c.includes(" vs ") || c.includes(" v. ") || c.includes(" Vs "),
     );
     const parties = titleCell?.split(/\s+(?:vs|v\.)\s+/i) || [];
 
@@ -560,7 +619,7 @@ function parseEcourtsSearchHtml(
       courtName: courtType === "HC" ? "High Court" : "District Court",
       cnrNumber: cnrMatch ? cnrMatch[1] : undefined,
       status: cellValues.find((c) =>
-        /pending|disposed|dismissed|allowed|decree/i.test(c)
+        /pending|disposed|dismissed|allowed|decree/i.test(c),
       ),
       petitioner: parties[0]?.trim(),
       respondent: parties[1]?.trim(),
@@ -577,17 +636,22 @@ function parseEcourtsSearchHtml(
  * Uses Claude Vision to solve CAPTCHA. Retries up to MAX_CAPTCHA_RETRIES times.
  */
 async function fetchDistrictCaseByCNR(
-  cnrNumber: string
+  cnrNumber: string,
 ): Promise<CaseStatus | null> {
   for (let attempt = 1; attempt <= MAX_CAPTCHA_RETRIES; attempt++) {
     const session = await getEcourtsSession(ECOURTS_DC_BASE);
     if (!session) return null;
 
     try {
-      const { url, body } = buildV6Request(ECOURTS_DC_BASE, "cnr_status/searchByCNR/", {
-        cino: cnrNumber.toUpperCase(),
-        fcaptcha_code: session.captchaValue,
-      }, session);
+      const { url, body } = buildV6Request(
+        ECOURTS_DC_BASE,
+        "cnr_status/searchByCNR/",
+        {
+          cino: cnrNumber.toUpperCase(),
+          fcaptcha_code: session.captchaValue,
+        },
+        session,
+      );
 
       const response = await fetch(url, {
         method: "POST",
@@ -609,7 +673,9 @@ async function fetchDistrictCaseByCNR(
       const text = await response.text();
       const parsed = parseV6Response(text);
       if (!parsed.success) {
-        console.warn(`[eCourts DC] CAPTCHA incorrect (attempt ${attempt}/${MAX_CAPTCHA_RETRIES}), retrying...`);
+        console.warn(
+          `[eCourts DC] CAPTCHA incorrect (attempt ${attempt}/${MAX_CAPTCHA_RETRIES}), retrying...`,
+        );
         if (attempt < MAX_CAPTCHA_RETRIES) continue;
         return null;
       }
@@ -628,32 +694,45 @@ async function fetchDistrictCaseByCNR(
  * Fetches case status from eCourts High Court service by CNR number.
  * Uses Claude Vision to solve CAPTCHA. Retries up to MAX_CAPTCHA_RETRIES times.
  */
-async function fetchHCCaseByCNR(
-  cnrNumber: string
-): Promise<CaseStatus | null> {
+async function fetchHCCaseByCNR(cnrNumber: string): Promise<CaseStatus | null> {
   for (let attempt = 1; attempt <= MAX_CAPTCHA_RETRIES; attempt++) {
     const session = await getEcourtsSession(ECOURTS_HC_BASE);
     if (!session) return null;
 
     try {
-      const { url, body } = buildV6Request(ECOURTS_HC_BASE, "cnr_status/searchByCNR/", {
-        cino: cnrNumber.toUpperCase(),
-        fcaptcha_code: session.captchaValue,
-      }, session);
+      const { url, body } = buildV6Request(
+        ECOURTS_HC_BASE,
+        "cnr_status/searchByCNR/",
+        {
+          cino: cnrNumber.toUpperCase(),
+          fcaptcha_code: session.captchaValue,
+        },
+        session,
+      );
 
       const response = await fetch(url, {
         method: "POST",
-        headers: { ...COMMON_HEADERS, Cookie: session.cookies, Referer: ECOURTS_HC_BASE, "X-Requested-With": "XMLHttpRequest" },
+        headers: {
+          ...COMMON_HEADERS,
+          Cookie: session.cookies,
+          Referer: ECOURTS_HC_BASE,
+          "X-Requested-With": "XMLHttpRequest",
+        },
         body,
         signal: AbortSignal.timeout(15000),
       });
 
-      if (!response.ok) { console.warn(`[eCourts HC] CNR request failed: ${response.status}`); return null; }
+      if (!response.ok) {
+        console.warn(`[eCourts HC] CNR request failed: ${response.status}`);
+        return null;
+      }
 
       const text = await response.text();
       const parsed = parseV6Response(text);
       if (!parsed.success) {
-        console.warn(`[eCourts HC] CAPTCHA incorrect (attempt ${attempt}/${MAX_CAPTCHA_RETRIES}), retrying...`);
+        console.warn(
+          `[eCourts HC] CAPTCHA incorrect (attempt ${attempt}/${MAX_CAPTCHA_RETRIES}), retrying...`,
+        );
         if (attempt < MAX_CAPTCHA_RETRIES) continue;
         return null;
       }
@@ -673,37 +752,54 @@ async function fetchHCCaseByCNR(
  * Uses Claude Vision to solve CAPTCHA. Retries up to MAX_CAPTCHA_RETRIES times.
  */
 async function fetchDistrictCaseByNumber(
-  identifier: CaseIdentifier
+  identifier: CaseIdentifier,
 ): Promise<CaseStatus | null> {
   for (let attempt = 1; attempt <= MAX_CAPTCHA_RETRIES; attempt++) {
     const session = await getEcourtsSession(ECOURTS_DC_BASE);
     if (!session) return null;
 
     try {
-      const { url, body } = buildV6Request(ECOURTS_DC_BASE, "casestatus/submitCaseNo", {
-        case_type: identifier.caseTypeCode || identifier.caseType,
-        search_case_no: identifier.caseNumber,
-        rgyear: identifier.caseYear,
-        state_code: identifier.stateCode || "",
-        dist_code: identifier.districtCode || "",
-        court_complex_code: identifier.courtCode || "0",
-        est_code: "0",
-        case_captcha_code: session.captchaValue,
-      }, session);
+      const { url, body } = buildV6Request(
+        ECOURTS_DC_BASE,
+        "casestatus/submitCaseNo",
+        {
+          case_type: identifier.caseTypeCode || identifier.caseType,
+          search_case_no: identifier.caseNumber,
+          rgyear: identifier.caseYear,
+          state_code: identifier.stateCode || "",
+          dist_code: identifier.districtCode || "",
+          court_complex_code: identifier.courtCode || "0",
+          est_code: "0",
+          case_captcha_code: session.captchaValue,
+        },
+        session,
+      );
 
       const response = await fetch(url, {
         method: "POST",
-        headers: { ...COMMON_HEADERS, Cookie: session.cookies, Referer: `${ECOURTS_DC_BASE}/?p=casestatus/index`, "X-Requested-With": "XMLHttpRequest" },
+        headers: {
+          ...COMMON_HEADERS,
+          Cookie: session.cookies,
+          Referer: `${ECOURTS_DC_BASE}/?p=casestatus/index`,
+          "X-Requested-With": "XMLHttpRequest",
+        },
         body,
         signal: AbortSignal.timeout(15000),
       });
 
-      if (!response.ok) { console.warn(`[eCourts DC] Case number request failed: ${response.status}`); return null; }
+      if (!response.ok) {
+        console.warn(
+          `[eCourts DC] Case number request failed: ${response.status}`,
+        );
+        return null;
+      }
 
       const text = await response.text();
       const parsed = parseV6Response(text);
       if (!parsed.success) {
-        console.warn(`[eCourts DC] CAPTCHA incorrect (attempt ${attempt}/${MAX_CAPTCHA_RETRIES}), retrying...`);
+        console.warn(
+          `[eCourts DC] CAPTCHA incorrect (attempt ${attempt}/${MAX_CAPTCHA_RETRIES}), retrying...`,
+        );
         if (attempt < MAX_CAPTCHA_RETRIES) continue;
         return null;
       }
@@ -723,34 +819,51 @@ async function fetchDistrictCaseByNumber(
  * Uses Claude Vision to solve CAPTCHA. Retries up to MAX_CAPTCHA_RETRIES times.
  */
 async function fetchHCCaseByNumber(
-  identifier: CaseIdentifier
+  identifier: CaseIdentifier,
 ): Promise<CaseStatus | null> {
   for (let attempt = 1; attempt <= MAX_CAPTCHA_RETRIES; attempt++) {
     const session = await getEcourtsSession(ECOURTS_HC_BASE);
     if (!session) return null;
 
     try {
-      const { url, body } = buildV6Request(ECOURTS_HC_BASE, "casestatus/submitCaseNo", {
-        case_type: identifier.caseTypeCode || identifier.caseType,
-        search_case_no: identifier.caseNumber,
-        rgyear: identifier.caseYear,
-        state_code: identifier.stateCode || "",
-        case_captcha_code: session.captchaValue,
-      }, session);
+      const { url, body } = buildV6Request(
+        ECOURTS_HC_BASE,
+        "casestatus/submitCaseNo",
+        {
+          case_type: identifier.caseTypeCode || identifier.caseType,
+          search_case_no: identifier.caseNumber,
+          rgyear: identifier.caseYear,
+          state_code: identifier.stateCode || "",
+          case_captcha_code: session.captchaValue,
+        },
+        session,
+      );
 
       const response = await fetch(url, {
         method: "POST",
-        headers: { ...COMMON_HEADERS, Cookie: session.cookies, Referer: `${ECOURTS_HC_BASE}/?p=casestatus/index`, "X-Requested-With": "XMLHttpRequest" },
+        headers: {
+          ...COMMON_HEADERS,
+          Cookie: session.cookies,
+          Referer: `${ECOURTS_HC_BASE}/?p=casestatus/index`,
+          "X-Requested-With": "XMLHttpRequest",
+        },
         body,
         signal: AbortSignal.timeout(15000),
       });
 
-      if (!response.ok) { console.warn(`[eCourts HC] Case number request failed: ${response.status}`); return null; }
+      if (!response.ok) {
+        console.warn(
+          `[eCourts HC] Case number request failed: ${response.status}`,
+        );
+        return null;
+      }
 
       const text = await response.text();
       const parsed = parseV6Response(text);
       if (!parsed.success) {
-        console.warn(`[eCourts HC] CAPTCHA incorrect (attempt ${attempt}/${MAX_CAPTCHA_RETRIES}), retrying...`);
+        console.warn(
+          `[eCourts HC] CAPTCHA incorrect (attempt ${attempt}/${MAX_CAPTCHA_RETRIES}), retrying...`,
+        );
         if (attempt < MAX_CAPTCHA_RETRIES) continue;
         return null;
       }
@@ -772,27 +885,37 @@ async function fetchHCCaseByNumber(
 async function searchDistrictByPartyName(
   partyName: string,
   stateCode?: string,
-  year?: string
+  year?: string,
 ): Promise<SearchResult[]> {
   for (let attempt = 1; attempt <= MAX_CAPTCHA_RETRIES; attempt++) {
     const session = await getEcourtsSession(ECOURTS_DC_BASE);
     if (!session) return [];
 
     try {
-      const { url, body } = buildV6Request(ECOURTS_DC_BASE, "casestatus/submitPartyName", {
-        petres_name: partyName,
-        state_code: stateCode || "",
-        dist_code: "0",
-        court_complex_code: "0",
-        est_code: "0",
-        rgyearP: year || "",
-        case_status: "",
-        fcaptcha_code: session.captchaValue,
-      }, session);
+      const { url, body } = buildV6Request(
+        ECOURTS_DC_BASE,
+        "casestatus/submitPartyName",
+        {
+          petres_name: partyName,
+          state_code: stateCode || "",
+          dist_code: "0",
+          court_complex_code: "0",
+          est_code: "0",
+          rgyearP: year || "",
+          case_status: "",
+          fcaptcha_code: session.captchaValue,
+        },
+        session,
+      );
 
       const response = await fetch(url, {
         method: "POST",
-        headers: { ...COMMON_HEADERS, Cookie: session.cookies, Referer: `${ECOURTS_DC_BASE}/?p=casestatus/index`, "X-Requested-With": "XMLHttpRequest" },
+        headers: {
+          ...COMMON_HEADERS,
+          Cookie: session.cookies,
+          Referer: `${ECOURTS_DC_BASE}/?p=casestatus/index`,
+          "X-Requested-With": "XMLHttpRequest",
+        },
         body,
         signal: AbortSignal.timeout(15000),
       });
@@ -802,7 +925,9 @@ async function searchDistrictByPartyName(
       const text = await response.text();
       const parsed = parseV6Response(text);
       if (!parsed.success) {
-        console.warn(`[eCourts DC] Search CAPTCHA incorrect (attempt ${attempt}/${MAX_CAPTCHA_RETRIES}), retrying...`);
+        console.warn(
+          `[eCourts DC] Search CAPTCHA incorrect (attempt ${attempt}/${MAX_CAPTCHA_RETRIES}), retrying...`,
+        );
         if (attempt < MAX_CAPTCHA_RETRIES) continue;
         return [];
       }
@@ -824,24 +949,34 @@ async function searchDistrictByPartyName(
 async function searchHCByPartyName(
   partyName: string,
   stateCode?: string,
-  year?: string
+  year?: string,
 ): Promise<SearchResult[]> {
   for (let attempt = 1; attempt <= MAX_CAPTCHA_RETRIES; attempt++) {
     const session = await getEcourtsSession(ECOURTS_HC_BASE);
     if (!session) return [];
 
     try {
-      const { url, body } = buildV6Request(ECOURTS_HC_BASE, "casestatus/submitPartyName", {
-        petres_name: partyName,
-        state_code: stateCode || "",
-        rgyearP: year || "",
-        case_status: "",
-        fcaptcha_code: session.captchaValue,
-      }, session);
+      const { url, body } = buildV6Request(
+        ECOURTS_HC_BASE,
+        "casestatus/submitPartyName",
+        {
+          petres_name: partyName,
+          state_code: stateCode || "",
+          rgyearP: year || "",
+          case_status: "",
+          fcaptcha_code: session.captchaValue,
+        },
+        session,
+      );
 
       const response = await fetch(url, {
         method: "POST",
-        headers: { ...COMMON_HEADERS, Cookie: session.cookies, Referer: `${ECOURTS_HC_BASE}/?p=casestatus/index`, "X-Requested-With": "XMLHttpRequest" },
+        headers: {
+          ...COMMON_HEADERS,
+          Cookie: session.cookies,
+          Referer: `${ECOURTS_HC_BASE}/?p=casestatus/index`,
+          "X-Requested-With": "XMLHttpRequest",
+        },
         body,
         signal: AbortSignal.timeout(15000),
       });
@@ -851,7 +986,9 @@ async function searchHCByPartyName(
       const text = await response.text();
       const parsed = parseV6Response(text);
       if (!parsed.success) {
-        console.warn(`[eCourts HC] Search CAPTCHA incorrect (attempt ${attempt}/${MAX_CAPTCHA_RETRIES}), retrying...`);
+        console.warn(
+          `[eCourts HC] Search CAPTCHA incorrect (attempt ${attempt}/${MAX_CAPTCHA_RETRIES}), retrying...`,
+        );
         if (attempt < MAX_CAPTCHA_RETRIES) continue;
         return [];
       }
@@ -874,7 +1011,9 @@ async function searchHCByPartyName(
  * Gets a session from HC eCourts including CSRF token and CAPTCHA.
  * HC uses a different page structure: cases/ki_petres.php with csrf-magic.js
  */
-async function getHCSession(stateCode: string): Promise<{ cookies: string; csrf: string; captchaValue: string } | null> {
+async function getHCSession(
+  stateCode: string,
+): Promise<{ cookies: string; csrf: string; captchaValue: string } | null> {
   try {
     const pageUrl = `${ECOURTS_HC_BASE}/cases/ki_petres.php?state_cd=${stateCode}&dist_cd=1&court_code=1`;
     const response = await fetch(pageUrl, {
@@ -883,24 +1022,45 @@ async function getHCSession(stateCode: string): Promise<{ cookies: string; csrf:
     });
     if (!response.ok) return null;
 
-    const cookies = (response.headers.getSetCookie?.() || []).map(c => c.split(";")[0]).filter(Boolean).join("; ");
+    const cookies = (response.headers.getSetCookie?.() || [])
+      .map((c) => c.split(";")[0])
+      .filter(Boolean)
+      .join("; ");
     const html = await response.text();
 
     const csrfMatch = html.match(/csrfMagicToken = "([^"]+)"/);
     const csrf = csrfMatch ? csrfMatch[1] : "";
 
-    const captchaMatch = html.match(/\/ecourtindiaHC\/securimage\/securimage_show\.php[^"']*/);
-    if (!captchaMatch || !isAIConfigured()) return { cookies, csrf, captchaValue: "" };
+    const captchaMatch = html.match(
+      /\/ecourtindiaHC\/securimage\/securimage_show\.php[^"']*/,
+    );
+    if (!captchaMatch || !isAIConfigured())
+      return { cookies, csrf, captchaValue: "" };
 
-    const imgRes = await fetch(`https://hcservices.ecourts.gov.in${captchaMatch[0]}`, {
-      headers: { Cookie: cookies, "User-Agent": COMMON_HEADERS["User-Agent"], Referer: pageUrl },
-      signal: AbortSignal.timeout(10000),
-    });
+    const imgRes = await fetch(
+      `https://hcservices.ecourts.gov.in${captchaMatch[0]}`,
+      {
+        headers: {
+          Cookie: cookies,
+          "User-Agent": COMMON_HEADERS["User-Agent"],
+          Referer: pageUrl,
+        },
+        signal: AbortSignal.timeout(10000),
+      },
+    );
     if (!imgRes.ok) return { cookies, csrf, captchaValue: "" };
 
-    const allCookies = [cookies, ...(imgRes.headers.getSetCookie?.() || []).map(c => c.split(";")[0])].filter(Boolean).join("; ");
-    const captchaAnswer = await solveCaptchaWithVision(Buffer.from(await imgRes.arrayBuffer()));
-    if (captchaAnswer) console.log(`[eCourts HC] CAPTCHA solved: "${captchaAnswer}"`);
+    const allCookies = [
+      cookies,
+      ...(imgRes.headers.getSetCookie?.() || []).map((c) => c.split(";")[0]),
+    ]
+      .filter(Boolean)
+      .join("; ");
+    const captchaAnswer = await solveCaptchaWithVision(
+      Buffer.from(await imgRes.arrayBuffer()),
+    );
+    if (captchaAnswer)
+      console.log(`[eCourts HC] CAPTCHA solved: "${captchaAnswer}"`);
     return { cookies: allCookies, csrf, captchaValue: captchaAnswer || "" };
   } catch (error) {
     console.error("[eCourts HC] Session error:", error);
@@ -918,9 +1078,10 @@ function parseHCResults(data: string): SearchResult[] {
 
   // Remove BOM
   const clean = data.startsWith("\ufeff") ? data.substring(1) : data;
-  const records = clean.split("##").filter(r => r.trim().length > 5);
+  const records = clean.split("##").filter((r) => r.trim().length > 5);
 
-  for (const rec of records.slice(0, 100)) { // Limit to 100 results
+  for (const rec of records.slice(0, 100)) {
+    // Limit to 100 results
     const fields = rec.split("~");
     if (fields.length < 4) continue;
 
@@ -930,7 +1091,9 @@ function parseHCResults(data: string): SearchResult[] {
     const bench = fields.length > 6 ? fields[6] : "";
 
     // Parse parties from HTML: "PETITIONER<br/>Versus<br/>RESPONDENT"
-    const parties = partiesHtml.replace(/<br\/?>/gi, "\n").split(/\nVersus\n|\nvs\.?\n/i);
+    const parties = partiesHtml
+      .replace(/<br\/?>/gi, "\n")
+      .split(/\nVersus\n|\nvs\.?\n/i);
     const petitioner = parties[0]?.replace(/<[^>]+>/g, "").trim() || "";
     const respondent = parties[1]?.replace(/<[^>]+>/g, "").trim() || "";
 
@@ -941,7 +1104,8 @@ function parseHCResults(data: string): SearchResult[] {
     const token = fields.length > 7 ? fields[7] : "";
 
     results.push({
-      caseTitle: petitioner && respondent ? `${petitioner} vs ${respondent}` : caseNo,
+      caseTitle:
+        petitioner && respondent ? `${petitioner} vs ${respondent}` : caseNo,
       caseNumber: caseMatch ? caseMatch[2] : caseNo,
       caseYear: caseMatch ? caseMatch[3] : "",
       caseType: caseMatch ? caseMatch[1] : "",
@@ -964,7 +1128,7 @@ function parseHCResults(data: string): SearchResult[] {
 async function searchHCByPartyNameDirect(
   partyName: string,
   stateCode: string,
-  year?: string
+  year?: string,
 ): Promise<SearchResult[]> {
   for (let attempt = 1; attempt <= MAX_CAPTCHA_RETRIES; attempt++) {
     const session = await getHCSession(stateCode);
@@ -983,23 +1147,31 @@ async function searchHCByPartyNameDirect(
         captcha: session.captchaValue,
       });
 
-      const response = await fetch(`${ECOURTS_HC_BASE}/cases/ki_petres_qry.php`, {
-        method: "POST",
-        headers: {
-          ...COMMON_HEADERS,
-          Cookie: session.cookies,
-          Referer: `${ECOURTS_HC_BASE}/cases/ki_petres.php?state_cd=${stateCode}&dist_cd=1&court_code=1`,
-          "X-Requested-With": "XMLHttpRequest",
+      const response = await fetch(
+        `${ECOURTS_HC_BASE}/cases/ki_petres_qry.php`,
+        {
+          method: "POST",
+          headers: {
+            ...COMMON_HEADERS,
+            Cookie: session.cookies,
+            Referer: `${ECOURTS_HC_BASE}/cases/ki_petres.php?state_cd=${stateCode}&dist_cd=1&court_code=1`,
+            "X-Requested-With": "XMLHttpRequest",
+          },
+          body: formData.toString(),
+          signal: AbortSignal.timeout(30000),
         },
-        body: formData.toString(),
-        signal: AbortSignal.timeout(30000),
-      });
+      );
 
       if (!response.ok) return [];
       const text = await response.text();
 
-      if (text.includes("error1") || text.toLowerCase().includes("invalid captcha")) {
-        console.warn(`[eCourts HC] CAPTCHA incorrect (attempt ${attempt}/${MAX_CAPTCHA_RETRIES})`);
+      if (
+        text.includes("error1") ||
+        text.toLowerCase().includes("invalid captcha")
+      ) {
+        console.warn(
+          `[eCourts HC] CAPTCHA incorrect (attempt ${attempt}/${MAX_CAPTCHA_RETRIES})`,
+        );
         if (attempt < MAX_CAPTCHA_RETRIES) continue;
         return [];
       }
@@ -1009,7 +1181,9 @@ async function searchHCByPartyNameDirect(
       }
 
       const results = parseHCResults(text);
-      console.log(`[eCourts HC] State ${stateCode}: ${results.length} results for "${partyName}"`);
+      console.log(
+        `[eCourts HC] State ${stateCode}: ${results.length} results for "${partyName}"`,
+      );
       return results;
     } catch (error) {
       console.error(`[eCourts HC] Search error (attempt ${attempt}):`, error);
@@ -1031,15 +1205,22 @@ export const ecourtsProvider: CourtApiProvider = {
     // Search HC if courtType is HC or not specified
     if (!params.courtType || params.courtType === "HC") {
       // Use direct HC scraper for AP and Telangana (or all HCs if no state specified)
-      const stateCodes = params.stateCode && HC_STATE_CODES[params.stateCode]
-        ? [HC_STATE_CODES[params.stateCode]]
-        : ["2", "29"]; // Default: AP + Telangana
+      const stateCodes =
+        params.stateCode && HC_STATE_CODES[params.stateCode]
+          ? [HC_STATE_CODES[params.stateCode]]
+          : ["2", "29"]; // Default: AP + Telangana
 
       for (const sc of stateCodes) {
         try {
-          const hcResults = await searchHCByPartyNameDirect(params.partyName, sc, params.year);
+          const hcResults = await searchHCByPartyNameDirect(
+            params.partyName,
+            sc,
+            params.year,
+          );
           results.push(...hcResults);
-          console.log(`[eCourts] HC state_cd=${sc}: ${hcResults.length} results`);
+          console.log(
+            `[eCourts] HC state_cd=${sc}: ${hcResults.length} results`,
+          );
         } catch (error) {
           console.error(`[eCourts] HC state_cd=${sc} search failed:`, error);
         }
@@ -1057,7 +1238,7 @@ export const ecourtsProvider: CourtApiProvider = {
         const dcResults = await searchDistrictByPartyName(
           params.partyName,
           params.stateCode,
-          params.year
+          params.year,
         );
         results.push(...dcResults);
       } catch (error) {
@@ -1068,9 +1249,7 @@ export const ecourtsProvider: CourtApiProvider = {
     return results;
   },
 
-  async getCaseStatus(
-    identifier: CaseIdentifier
-  ): Promise<CaseStatus | null> {
+  async getCaseStatus(identifier: CaseIdentifier): Promise<CaseStatus | null> {
     // Route to the appropriate court system
 
     // If CNR number is available, prefer CNR lookup
