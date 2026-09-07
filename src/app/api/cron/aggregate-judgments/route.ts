@@ -10,6 +10,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   fetchJudgmentsForAllCourts,
+  IK_PAGE_SIZE,
   type IKCourtCode,
 } from "@/lib/courts/ik-judgments";
 import { ingestNews } from "@/lib/news/ingest";
@@ -31,6 +32,24 @@ const ROUTE_BUDGET_MS = 55_000;
 const CHUNK_BACKFILL_MAX_TIDS = 8;
 const CHUNK_BACKFILL_TIME_BUDGET_MS = 40_000;
 
+/**
+ * Pages of `IK_PAGE_SIZE` to pull per court per run. This is the ingest's
+ * coverage/cost dial: IK bills per call, so raising it costs money. Every
+ * run now reports `coverage.available` vs `coverage.fetched` so the value
+ * can be chosen from real numbers instead of guessed.
+ */
+const PAGES_PER_COURT = 1;
+
+/** Per-court ingest accounting, returned so truncation cannot stay silent. */
+interface CourtIngestReport {
+  /** Total IK holds for the window; null if IK's `found` was unparseable. */
+  found: number | null;
+  fetched: number;
+  upserted: number;
+  truncated: boolean;
+  error?: string;
+}
+
 const DEFAULT_COURTS: IKCourtCode[] = [
   "supremecourt",
   "amravati",
@@ -47,10 +66,20 @@ async function ingestJudgments() {
   const startTime = Date.now();
   const supabase = createAdminClient();
 
-  // Look back 2 days — IK indexing has overnight lag
+  // Look back 4 days. IK's indexing lag is not uniform across courts: over
+  // 01-06 -> 03-09-2026 Allahabad carried 9,389 judgments (~100/day), yet a
+  // 2-day window returned "No matching results" for it on every run, so the
+  // court contributed nothing at all. Widening costs no extra API calls (the
+  // page budget below is per court, not per day) and the upsert is keyed on
+  // ik_tid, so re-seeing a judgment is free.
+  //
+  // NOTE: this only helps courts that fall UNDER the page cap. A court with
+  // more than `pagesPerCourt * IK_PAGE_SIZE` hits in the window is still
+  // truncated to the most recent ones, and a wider window does not change
+  // which ten those are. See the `truncated` counts this route now returns.
   const toDate = new Date();
   const fromDate = new Date();
-  fromDate.setDate(fromDate.getDate() - 2);
+  fromDate.setDate(fromDate.getDate() - 4);
 
   const fromStr = fromDate.toISOString().slice(0, 10);
   const toStr = toDate.toISOString().slice(0, 10);
@@ -62,35 +91,67 @@ async function ingestJudgments() {
     courts: DEFAULT_COURTS,
     fromDate,
     toDate,
-    pagesPerCourt: 1,
+    pagesPerCourt: PAGES_PER_COURT,
   });
 
   let upserted = 0;
   let errors = 0;
-  const breakdown: Record<string, number> = {};
+  let availableTotal = 0;
+  let fetchedTotal = 0;
+  const truncatedCourts: string[] = [];
+  const breakdown: Record<string, CourtIngestReport> = {};
 
-  for (const [court, judgments] of byCourt.entries()) {
-    breakdown[court] = judgments.length;
-    if (!judgments.length) continue;
+  for (const [court, result] of byCourt.entries()) {
+    const report: CourtIngestReport = {
+      found: result.found,
+      fetched: result.records.length,
+      upserted: 0,
+      truncated: result.truncated,
+    };
+    if (result.error) report.error = result.error;
+    breakdown[court] = report;
+
+    fetchedTotal += result.records.length;
+    if (result.found !== null) availableTotal += result.found;
+    if (result.truncated) truncatedCourts.push(court);
+
+    if (!result.records.length) continue;
 
     const { data, error } = await supabase
       .from("judgments")
-      .upsert(judgments, { onConflict: "ik_tid", ignoreDuplicates: false })
+      .upsert(result.records, {
+        onConflict: "ik_tid",
+        ignoreDuplicates: false,
+      })
       .select("id");
 
     if (error) {
       errors++;
+      report.error = error.message;
       console.error(`[Judgments] Upsert failed for ${court}:`, error.message);
       continue;
     }
 
-    upserted += data?.length || 0;
+    report.upserted = data?.length || 0;
+    upserted += report.upserted;
     console.log(
-      `[Judgments] ${court}: ${judgments.length} fetched, ${data?.length || 0} upserted`,
+      `[Judgments] ${court}: IK holds ${report.found ?? "?"}, fetched ` +
+        `${report.fetched}, upserted ${report.upserted}` +
+        (report.truncated ? " — TRUNCATED" : ""),
     );
   }
 
   const duration = Date.now() - startTime;
+  // The shortfall line is the point of this instrumentation: before it, an
+  // ingest taking 70 of 1,650 available judgments logged as a clean success.
+  if (truncatedCourts.length) {
+    console.warn(
+      `[Judgments] TRUNCATED ${truncatedCourts.length}/${DEFAULT_COURTS.length} ` +
+        `courts (${truncatedCourts.join(", ")}): fetched ${fetchedTotal} of ` +
+        `${availableTotal} available at ${PAGES_PER_COURT} page(s) x ` +
+        `${IK_PAGE_SIZE}/court. Raise PAGES_PER_COURT to close the gap.`,
+    );
+  }
   console.log(
     `[Judgments] Done in ${duration}ms: ${upserted} upserted, ${errors} errors`,
   );
@@ -101,6 +162,13 @@ async function ingestJudgments() {
     upserted,
     errors,
     breakdown,
+    coverage: {
+      available: availableTotal,
+      fetched: fetchedTotal,
+      truncatedCourts,
+      pagesPerCourt: PAGES_PER_COURT,
+      pageSize: IK_PAGE_SIZE,
+    },
     duration,
     range: { from: fromStr, to: toStr },
   };
