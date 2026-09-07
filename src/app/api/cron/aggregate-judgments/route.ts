@@ -38,7 +38,7 @@ const DEFAULT_COURTS: IKCourtCode[] = [
   "bombay",
   "delhi",
   "chennai",
-  "bangalore",
+  "karnataka",
   "allahabad",
   "madhyapradesh",
 ];
